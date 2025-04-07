@@ -1,0 +1,257 @@
+
+openapi: 3.0.3
+info:
+  title: Chat API
+  version: 1.0.0
+  description: 채팅방 관리 및 히스토리 조회 API 문서
+
+servers:
+  - url: https://goodmorning.com
+
+
+paths:
+  /mypage:
+    patch:
+      summary: 마이페이지 수정
+      description: 사용자의 마이페이지 정보를 수정합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMyPageRequest'
+      responses:
+        '200':
+          description: 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: 잘못된 요청
+        '401':
+          description: 인증 실패
+
+  /chatrooms:
+    post:
+      summary: 채팅방 생성
+      description: 새로운 채팅방을 생성합니다. 참여자 두 명의 좌표를 포함해야 합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChatroomRequest'
+      responses:
+        '201':
+          description: 채팅방 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chatroom'
+        '400':
+          description: 잘못된 요청
+
+    get:
+      summary: 활성화된 채팅방 목록 조회
+      description: 현재 활성화된 채팅방 목록을 조회합니다.
+      responses:
+        '200':
+          description: 채팅방 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Chatroom'
+
+  /chatrooms/{roomId}:
+    get:
+      summary: 채팅방 조회
+      description: 채팅방을 누구나 조회할 수 있습니다.
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 채팅방 조회 성공
+        '404':
+          description: 채팅방 없음
+
+    patch:
+      summary: 채팅방 수정
+      description: 채팅방의 정보를 수정합니다. 참여자만 수정할 수 있습니다.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateChatroomRequest'
+      responses:
+        '200':
+          description: 수정 성공
+        '404':
+          description: 채팅방 없음
+
+    delete:
+      summary: 채팅방 삭제
+      description: 채팅방을 삭제합니다. 참여자만 삭제할 수 있습니다.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 삭제 성공
+        '404':
+          description: 채팅방 없음
+
+  /chatrooms/{roomId}/messages:
+    get:
+      summary: 채팅방 히스토리 검색
+      description: 키워드 기반으로 채팅 메시지를 검색합니다.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 메시지 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Coordinate:
+      type: object
+      properties:
+        latitude:
+          type: number
+          format: float
+        longitude:
+          type: number
+          format: float
+
+    Participant:
+      type: object
+      properties:
+        userId:
+          type: string
+        coordinate:
+          $ref: '#/components/schemas/Coordinate'
+
+    CreateChatroomRequest:
+      type: object
+      required:
+        - participants
+      properties:
+        title:
+          type: string
+        participants:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/Participant'
+    
+    UpdateMyPageRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        bio:
+          type: string
+        profileImageUrl:
+          type: string
+
+    UpdateChatroomRequest:
+      type: object
+      properties:
+        title:
+          type: string
+
+    Chatroom:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Participant'
+        createdAt:
+          type: string
+          format: date-time
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        bio:
+          type: string
+        profileImageUrl:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        senderId:
+          type: string
+        content:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
