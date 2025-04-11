@@ -14,15 +14,21 @@ services:
       - APP_NAME=FastAPI Firebase Auth
       - DEBUG=True
       - GOOGLE_APPLICATION_CREDENTIALS=/app/docker/firebase-adminsdk.json
+      - DATABASE_URL=postgresql://postgres:password@db:5432/mhp_db
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - db
 
-  test:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+  db:
+    image: postgres:13
     volumes:
-      - ..:/app
+      - postgres_data:/var/lib/postgresql/data
     environment:
-      - PYTHONPATH=/app
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/docker/firebase-adminsdk.json
-    command: pytest -v app/tests 
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=mhp_db
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data: 
