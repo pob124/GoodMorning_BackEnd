@@ -179,3 +179,102 @@ pytest -v app/tests
 ## 라이선스
 
 MIT 
+
+## MHP_TEST 사용 가능한 기능 및 절차
+
+### 사용 가능한 기능
+
+#### 1. 사용자 인증 및 관리
+- 이메일/비밀번호 회원가입 및 로그인
+- 구글 소셜 로그인
+- 사용자 프로필 관리
+- 비밀번호 재설정
+
+#### 2. 데이터베이스 연동
+- PostgreSQL 데이터베이스 연동
+- Alembic을 통한 데이터베이스 마이그레이션 관리
+- 사용자 데이터 CRUD 작업
+
+#### 3. API 기능
+- JWT 토큰 기반 인증된 API 엔드포인트
+- Swagger 및 ReDoc을 통한 API 문서화
+- API 버전 관리
+
+#### 4. 배포 및 인프라
+- Docker 컨테이너화
+- Docker Compose를 통한 다중 서비스 관리
+- Firebase Admin SDK 통합
+
+### 사용 절차
+
+#### 개발 환경 설정
+1. 소스 코드 클론
+   ```bash
+   git clone [repository-url]
+   cd MHP_TEST
+   ```
+
+2. 가상환경 설정
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Linux/Mac
+   venv\Scripts\activate     # Windows
+   ```
+
+3. 패키지 설치
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Firebase 서비스 계정 키 설정
+   - `docker/firebase-adminsdk.json` 파일 확인 또는 생성
+
+#### 데이터베이스 마이그레이션
+1. 마이그레이션 실행
+   ```bash
+   alembic upgrade head
+   ```
+
+2. 새 마이그레이션 생성 (스키마 변경 시)
+   ```bash
+   alembic revision --autogenerate -m "설명"
+   ```
+
+#### 로컬 서버 실행
+1. FastAPI 서버 실행
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+2. 서버 접속
+   - API 서버: http://localhost:8000
+   - API 문서: http://localhost:8000/docs
+
+#### Docker 환경에서 실행
+1. Docker 컨테이너 빌드 및 실행
+   ```bash
+   cd docker
+   docker-compose up -d
+   ```
+
+2. 컨테이너 로그 확인
+   ```bash
+   docker-compose logs -f
+   ```
+
+#### 테스트 실행
+1. 전체 테스트 실행
+   ```bash
+   pytest
+   ```
+
+2. 특정 테스트 파일 실행
+   ```bash
+   pytest app/tests/test_auth.py -v
+   ```
+
+### 문제 해결
+
+- **Firebase 연결 오류**: Firebase 서비스 계정 키 파일이 올바른 위치에 있는지 확인하세요.
+- **데이터베이스 연결 오류**: PostgreSQL 연결 문자열과 데이터베이스 서버 실행 여부를 확인하세요.
+- **API 응답 오류**: 로그를 확인하고 JWT 토큰이 유효한지 확인하세요. 

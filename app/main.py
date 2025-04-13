@@ -7,6 +7,7 @@ from app.core import get_settings
 from app.api import router as api_router
 from app.auth import router as auth_router
 
+# 코어 모듈 먼저 초기화
 settings = get_settings()
 
 app = FastAPI(
@@ -27,8 +28,10 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# 라우터 등록
+# API 라우터 등록
 app.include_router(api_router, prefix="/api")
+
+# 인증 라우터 등록
 app.include_router(auth_router, prefix="/auth")
 
 @app.get("/")

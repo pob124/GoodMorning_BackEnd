@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.models.models import User as UserSchema
-from app.models.database_models import User as UserModel
+from app.models.database_models import User as models
 from app.core import get_settings
 from app.auth.utils import get_current_user
 from app.core.database import get_db
@@ -23,7 +22,7 @@ class UserResponse(BaseModel):
     is_active: bool
 
 @router.get("/users/me", response_model=UserResponse)
-async def read_users_me(current_user: UserModel = Depends(get_current_user)):
+async def read_users_me(current_user: models = Depends(get_current_user)):
     """현재 인증된 사용자 정보를 반환합니다."""
     return {
         "id": str(current_user.id),
@@ -36,7 +35,7 @@ async def read_users_me(current_user: UserModel = Depends(get_current_user)):
 @router.post("/users/me", response_model=UserResponse)
 async def update_users_me(
     user_update: UserUpdate,
-    current_user: UserModel = Depends(get_current_user),
+    current_user: models = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """현재 인증된 사용자 정보를 업데이트합니다."""
@@ -57,7 +56,7 @@ async def update_users_me(
 
 @router.delete("/users/me", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_users_me(
-    current_user: UserModel = Depends(get_current_user),
+    current_user: models = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """현재 인증된 사용자 계정을 비활성화합니다."""

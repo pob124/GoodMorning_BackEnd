@@ -1,22 +1,27 @@
 from fastapi import APIRouter, HTTPException, Request, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from firebase_admin import auth
-from app.models.models import UserData, SignupData, Token, User as UserSchema
+from app.models.models import User, Token, TokenData, SignupData, UserData, User as UserSchema
 from app.models.database_models import User as UserModel
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from typing import Optional
 from app.core.firebase import initialize_firebase
 from app.core import get_settings
-from app.api import schemas, models
+from app.models.database_models import User as models
 from app.auth.utils import verify_token, get_current_user
 import uuid
+from pydantic import BaseModel
 
 router = APIRouter()
 settings = get_settings()
 firebase_app = initialize_firebase()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    username: Optional[str] = None
 
 @router.post("/google-auth")
 async def google_auth(user_data: UserData, db: Session = Depends(get_db)):
@@ -123,14 +128,20 @@ async def register(user: UserSchema):
             detail=str(e)
         )
 
-@router.get("/users/me", response_model=schemas.User)
-async def read_users_me(current_user: models.User = Depends(get_current_user)):
-    return current_user
+@router.get("/users/me", response_model=UserSchema)
+async def read_users_me(current_user: UserModel = Depends(get_current_user)):
+    return {
+        "id": str(current_user.id) if hasattr(current_user, "id") else None,
+        "email": current_user.email,
+        "name": current_user.name,
+        "username": getattr(current_user, "username", None),
+        "is_active": current_user.is_active
+    }
 
-@router.post("/users/me", response_model=schemas.User)
+@router.post("/users/me", response_model=UserSchema)
 async def update_users_me(
-    user_update: schemas.UserUpdate,
-    current_user: models.User = Depends(get_current_user),
+    user_update: UserUpdate,
+    current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     # 현재 사용자 정보 업데이트
@@ -139,11 +150,18 @@ async def update_users_me(
     
     db.commit()
     db.refresh(current_user)
-    return current_user
+    
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "name": current_user.name,
+        "username": getattr(current_user, "username", None),
+        "is_active": current_user.is_active
+    }
 
 @router.delete("/users/me", status_code=204)
 async def delete_users_me(
-    current_user: models.User = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     # 사용자 계정 비활성화 (또는 삭제)
@@ -160,8 +178,8 @@ async def verify_auth_token(token_data: dict = Depends(verify_token)):
         "name": token_data["name"]
     }
 
-@router.post("/register")
-async def register_user(token_data: dict = Depends(verify_token), db: Session = Depends(get_db)):
+@router.post("/register-with-token")
+async def register_user_with_token(token_data: dict = Depends(verify_token), db: Session = Depends(get_db)):
     """인증된 Firebase 사용자를 데이터베이스에 등록합니다."""
     # 이미 존재하는 사용자인지 확인
     existing_user = db.query(UserModel).filter(UserModel.firebase_uid == token_data["firebase_uid"]).first()
