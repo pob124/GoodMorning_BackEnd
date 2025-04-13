@@ -2,6 +2,17 @@
 
 FastAPI와 Firebase Authentication을 사용한 인증 시스템 구현 프로젝트입니다.
 
+## 최근 업데이트 및 새로운 기능 (2023.09)
+
+- **사용자 프로필 기능 추가**: 사용자 모델에 프로필 관련 필드 추가 (프로필 사진, 자기소개, 전화번호 등)
+- **로그인 정보 추적 기능**: 마지막 로그인 시간 및 IP 추적 기능 구현
+- **통합 프로필 정보 API**: `/api/users/me` 엔드포인트를 통한 사용자 프로필 정보 조회 기능
+- **데이터베이스 마이그레이션 개선**: Alembic을 통한 자동 마이그레이션 스크립트 생성
+- **프론트엔드 디버깅 개선**: 프론트엔드에서 API 호출 디버깅을 위한 상세 로깅 추가
+- **CORS 설정 최적화**: 클라이언트-서버 간 안전한 통신을 위한 CORS 설정 개선
+- **인증 로직 통합**: 인증 관련 코드를 API와 분리하여 재사용성 향상
+- **템플릿 엔진 활용**: FastAPI의 Jinja2 템플릿 엔진을 활용한 HTML 서빙
+
 ## 주요 기능
 
 - Firebase 기반 이메일/비밀번호 인증
@@ -212,6 +223,39 @@ pytest -v app/tests
 - Swagger UI: http://localhost:9090/docs
 - ReDoc: http://localhost:9090/redoc
 
+## 새로운 엔드포인트
+
+### 사용자 프로필 관련 엔드포인트
+
+- `GET /api/users/me`: 현재 로그인한 사용자의 프로필 정보 조회
+- `POST /api/users/me`: 현재 로그인한 사용자의 프로필 정보 업데이트
+- `DELETE /api/users/me`: 현재 로그인한 사용자 계정 비활성화
+
+### 데이터베이스 확인 엔드포인트
+
+- `GET /api/db-check`: 데이터베이스 연결 상태 및 사용자 테이블 데이터 확인
+- `GET /auth/check-users`: 데이터베이스에 저장된 사용자 목록 확인
+
+### 시스템 정보 엔드포인트
+
+- `GET /routes`: 등록된 모든 라우트 정보 확인
+- `GET /api/test`: API 라우터 연결 테스트 (인증 불필요)
+
+## 데이터베이스 스키마
+
+사용자(User) 테이블에 다음 필드가 추가되었습니다:
+
+| 필드명 | 타입 | 설명 |
+|--------|------|------|
+| profile_picture | String | 사용자 프로필 이미지 URL |
+| bio | Text | 사용자 자기소개 |
+| phone_number | String | 전화번호 |
+| location | String | 위치 정보 |
+| birth_date | DateTime | 생년월일 |
+| gender | String | 성별 |
+| last_login_at | DateTime | 마지막 로그인 시간 |
+| last_login_ip | String | 마지막 로그인 IP 주소 |
+
 ## 보안 주의사항
 
 - Firebase 서비스 계정 키(`firebase-adminsdk.json`)는 절대 공개 저장소에 커밋하지 마세요
@@ -420,4 +464,89 @@ MIT
 4. 네트워크 설정:
    - 방화벽이 9090 포트를 차단하지 않는지 확인
    - Docker 네트워크가 정상적으로 구성되어 있는지 확인
-  
+
+## 사용자 프로필 기능 사용 방법
+
+새로 추가된 사용자 프로필 기능을 사용하는 방법은 다음과 같습니다:
+
+### 사용자 프로필 정보 조회하기
+
+1. **웹 인터페이스를 통한 방법**:
+   - 로그인 페이지 (http://localhost:9090/login)에 접속
+   - 'Google로 로그인' 버튼을 클릭하여 로그인
+   - 로그인 후 "내 프로필 정보 가져오기" 버튼 클릭
+   - 결과 영역에 JSON 형태로 프로필 정보 표시
+
+2. **API 직접 호출 방법**:
+   - 토큰 획득: 웹 인터페이스에서 로그인 후 개발자 도구 콘솔에서 다음 코드 실행
+     ```javascript
+     await firebase.auth().currentUser.getIdToken()
+     ```
+   - Postman이나 curl로 API 호출:
+     ```bash
+     curl -X GET http://localhost:9090/api/users/me \
+          -H "Authorization: Bearer 복사한_토큰" \
+          -H "Content-Type: application/json"
+     ```
+
+### 사용자 프로필 정보 업데이트하기
+
+1. **API 호출 방법**:
+   ```bash
+   curl -X POST http://localhost:9090/api/users/me \
+        -H "Authorization: Bearer 복사한_토큰" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "새 이름",
+          "bio": "자기소개",
+          "profile_picture": "이미지URL",
+          "phone_number": "전화번호",
+          "location": "위치",
+          "gender": "성별"
+        }'
+   ```
+
+2. **응답 확인**:
+   - 성공 시 업데이트된 사용자 정보가 JSON 형태로 반환됩니다.
+   - 실패 시 오류 메시지와 함께 상태 코드가 반환됩니다.
+
+### 프로필 정보 저장 및 관리
+
+1. **데이터베이스 확인**:
+   - PGAdmin(http://localhost:5050)에 접속하여 로그인
+   - 등록된 서버에 연결하여 `mhp_db` 데이터베이스 선택
+   - `users` 테이블을 조회하여 저장된 프로필 정보 확인
+
+2. **사용자 목록 조회**:
+   - 브라우저에서 `http://localhost:9090/auth/check-users` 접속
+   - 데이터베이스에 저장된 모든 사용자 정보 확인
+
+### 문제 해결
+
+- **프로필 정보가 보이지 않는 경우**:
+  1. 데이터베이스 마이그레이션이 제대로 실행되었는지 확인:
+     ```bash
+     cd docker
+     docker-compose exec web alembic upgrade head
+     ```
+  2. 토큰이 유효한지 확인 (만료된 경우 재로그인)
+  3. API 경로가 올바른지 확인 (`/api/users/me`)
+
+- **업데이트가 적용되지 않는 경우**:
+  1. 요청 헤더와 본문 형식이 올바른지 확인
+  2. 서버 로그 확인:
+     ```bash
+     docker-compose logs -f web
+     ```
+
+### 사용자 계정 비활성화
+
+1. **API 호출 방법**:
+   ```bash
+   curl -X DELETE http://localhost:9090/api/users/me \
+        -H "Authorization: Bearer 복사한_토큰"
+   ```
+
+2. **계정 상태 확인**:
+   - 비활성화 후 로그인 시도하면 오류 메시지 표시
+   - 데이터베이스에서 해당 사용자의 `is_active` 필드가 `false`로 변경된 것 확인 가능 
