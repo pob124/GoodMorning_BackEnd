@@ -5,8 +5,8 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-# Docker 환경에서 사용
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@db:5432/mhp_db"
+# 설정에서 데이터베이스 URL 가져오기
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

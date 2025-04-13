@@ -30,6 +30,8 @@
             <h2>API 테스트</h2>
             <button id="call-api-btn" class="api-btn">보호된 API 호출</button>
             <div id="api-result" class="result-box"></div>
+            <button id="get-profile-btn" class="api-btn">내 프로필 정보 가져오기</button>
+            <div id="profile-result" class="result-box"></div>
         </div>
     </div>
 
@@ -54,10 +56,12 @@
         const googleLoginBtn = document.getElementById('google-login-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const callApiBtn = document.getElementById('call-api-btn');
+        const getProfileBtn = document.getElementById('get-profile-btn');
         const loginContainer = document.getElementById('login-container');
         const userInfo = document.getElementById('user-info');
         const apiTest = document.getElementById('api-test');
         const apiResult = document.getElementById('api-result');
+        const profileResult = document.getElementById('profile-result');
         
         // Google 로그인 기능
         googleLoginBtn.addEventListener('click', () => {
@@ -70,7 +74,7 @@
                 })
                 .then((idToken) => {
                     // 백엔드에 ID 토큰 전송
-                    return fetch('/auth/google-auth', {
+                    return fetch('http://localhost:9090/auth/google-auth', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -113,7 +117,7 @@
             
             try {
                 const idToken = await auth.currentUser.getIdToken();
-                const response = await fetch('/auth/protected-endpoint', {
+                const response = await fetch('http://localhost:9090/auth/protected-endpoint', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${idToken}`,
@@ -126,6 +130,51 @@
             } catch (error) {
                 console.error('API 호출 에러:', error);
                 apiResult.textContent = '에러: ' + error.message;
+            }
+        });
+        
+        // 사용자 프로필 정보 가져오기
+        getProfileBtn.addEventListener('click', async () => {
+            if (!auth.currentUser) {
+                profileResult.textContent = '로그인이 필요합니다.';
+                return;
+            }
+            
+            try {
+                profileResult.textContent = '프로필 정보 가져오는 중...';
+                console.log('프로필 정보 가져오기 시작');
+                
+                const idToken = await auth.currentUser.getIdToken();
+                console.log('ID 토큰 획득:', idToken.substring(0, 10) + '...');
+                
+                // API 요청 URL 출력
+                const apiUrl = 'http://localhost:9090/api/users/me';
+                console.log('API 요청 URL:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                console.log('응답 상태 코드:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API 응답 에러:', errorText);
+                    throw new Error(`HTTP error! Status: ${response.status}, Details: ${errorText || '응답 없음'}`);
+                }
+                
+                const data = await response.json();
+                profileResult.textContent = JSON.stringify(data, null, 2);
+                
+                console.log('프로필 정보 성공적으로 수신:', data);
+            } catch (error) {
+                console.error('프로필 정보 가져오기 에러:', error);
+                profileResult.textContent = '에러: ' + error.message;
             }
         });
         

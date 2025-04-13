@@ -9,6 +9,7 @@ FastAPI와 Firebase Authentication을 사용한 인증 시스템 구현 프로�
 - 보호된 API 엔드포인트
 - JWT 토큰 기반 인증
 - Docker 컨테이너화
+- PostgreSQL 데이터베이스 연동
 
 ## 프로젝트 구조
 
@@ -56,6 +57,38 @@ project/
    - 프로젝트 설정 > 서비스 계정 > Firebase Admin SDK > 새 비공개 키 생성
    - 다운로드된 JSON 파일을 `docker/firebase-adminsdk.json`로 저장
 
+### PostgreSQL 데이터베이스 설정
+
+현재 PostgreSQL 데이터베이스는 다음과 같이 설정되어 있습니다:
+- **사용자**: hch3154
+- **비밀번호**: admin
+- **데이터베이스 이름**: mhp_db
+- **포트**: 5432
+
+### PGAdmin 접속 방법
+
+1. 브라우저에서 다음 URL로 접속:
+   ```
+   http://localhost:5050
+   ```
+
+2. 다음 자격 증명으로 로그인:
+   - 이메일: hch3154@gmail.com
+   - 비밀번호: admin
+
+3. 서버 등록하기:
+   - "Servers" > 마우스 오른쪽 버튼 클릭 > "Create" > "Server..."
+   - "General" 탭:
+     - Name: MHP_DB (또는 원하는 이름)
+   - "Connection" 탭:
+     - Host name/address: localhost (또는 Docker 네트워크의 컨테이너 IP 주소)
+     - Port: 5432
+     - Maintenance database: mhp_db
+     - Username: hch3154
+     - Password: admin
+
+4. PGAdmin을 통해 데이터베이스 스키마 및 데이터 관리가 가능합니다.
+
 ### 설치 및 실행
 
 #### Docker 환경에서 실행 (권장)
@@ -74,13 +107,21 @@ project/
    ```bash
    cd docker
    docker-compose build web
-   docker-compose up web
+   docker-compose up
    ```
 
 4. 브라우저에서 접속
-   - http://localhost:8000
+   - API 서버: http://localhost:9090
+   - PGAdmin: http://localhost:5050
+   - API 문서: http://localhost:9090/docs
 
-5. 로그 확인 (문제 해결)
+5. 데이터베이스 마이그레이션 실행
+   ```bash
+   # 새 터미널에서 실행
+   docker-compose exec web alembic upgrade head
+   ```
+
+6. 로그 확인 (문제 해결)
    ```bash
    # 실시간 로그 확인
    docker-compose logs -f web
@@ -90,6 +131,7 @@ project/
    ```bash
    # Ctrl+C로 종료 또는 다른 터미널에서
    docker-compose down
+   docker-compose up
    ```
 
 #### 로컬 개발 환경
@@ -145,7 +187,7 @@ pytest -v app/tests
    ```
 
 3. 브라우저에서 테스트
-   - http://localhost:8000 접속
+   - http://localhost:9090 접속
    - "Google로 로그인" 버튼 클릭
    - 구글 계정으로 로그인
    - 로그인 성공 시 사용자 정보 표시
@@ -159,7 +201,7 @@ pytest -v app/tests
 ### 로컬 환경에서 구글 로그인 테스트
 
 애플리케이션이 실행된 상태에서 동일한 단계로 테스트할 수 있습니다:
-1. http://localhost:8000 접속
+1. http://localhost:9090 접속
 2. "Google로 로그인" 버튼 클릭
 3. 구글 계정 선택 및 인증
 4. 로그인 성공 시 사용자 정보 확인
@@ -167,8 +209,8 @@ pytest -v app/tests
 
 ## API 문서
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://localhost:9090/docs
+- ReDoc: http://localhost:9090/redoc
 
 ## 보안 주의사항
 
@@ -247,8 +289,8 @@ MIT
    ```
 
 2. 서버 접속
-   - API 서버: http://localhost:8000
-   - API 문서: http://localhost:8000/docs
+   - API 서버: http://localhost:9090
+   - API 문서: http://localhost:9090/docs
 
 #### Docker 환경에서 실행
 1. Docker 컨테이너 빌드 및 실행
@@ -277,4 +319,105 @@ MIT
 
 - **Firebase 연결 오류**: Firebase 서비스 계정 키 파일이 올바른 위치에 있는지 확인하세요.
 - **데이터베이스 연결 오류**: PostgreSQL 연결 문자열과 데이터베이스 서버 실행 여부를 확인하세요.
-- **API 응답 오류**: 로그를 확인하고 JWT 토큰이 유효한지 확인하세요. 
+- **API 응답 오류**: 로그를 확인하고 JWT 토큰이 유효한지 확인하세요.
+- **PGAdmin 연결 오류**: 올바른 호스트 이름/IP와 사용자 자격 증명을 사용하고 있는지 확인하세요.
+  - Docker 네트워크 내에서 컨테이너 간 통신 문제가 있는 경우 `localhost` 대신 컨테이너 IP 주소를 사용해보세요. 
+
+## 구글 로그인 테스트 방법
+
+### 웹 인터페이스를 통한 테스트 (가장 간단한 방법)
+
+1. Docker Compose로 서버 실행:
+   ```bash
+   cd docker
+   docker-compose up
+   ```
+
+2. 웹 브라우저에서 접속:
+   ```
+   http://localhost:9090
+   ```
+
+3. 구글 로그인 진행:
+   - "Google로 로그인" 버튼 클릭
+   - 구글 계정으로 로그인
+   - 로그인 성공 시 사용자 정보가 화면에 표시됨
+   - "보호된 API 호출" 버튼으로 인증된 API 요청 테스트 가능
+
+4. 개발자 도구에서 결과 확인:
+   - 브라우저의 개발자 도구(F12) > 콘솔 탭에서 로그 확인
+   - 로그인 성공 및 백엔드 응답 메시지 확인
+
+### API 테스트 도구를 사용한 테스트 (Postman, curl 등)
+
+1. 웹 인터페이스에서 먼저 구글 로그인을 수행합니다.
+
+2. ID 토큰 가져오기:
+   - 개발자 도구 콘솔에서 다음 코드 실행:
+   ```javascript
+   await firebase.auth().currentUser.getIdToken(true)
+   ```
+   - 출력된 토큰 문자열을 복사
+
+3. Postman으로 테스트:
+   - 구글 인증 API 테스트:
+     - URL: `http://localhost:9090/auth/google-auth`
+     - Method: POST
+     - Headers: `Content-Type: application/json`
+     - Body:
+     ```json
+     {
+       "id_token": "복사한_ID_토큰",
+       "name": "사용자_이름",
+       "profile_picture": "프로필_사진_URL"
+     }
+     ```
+
+   - 보호된 엔드포인트 테스트:
+     - URL: `http://localhost:9090/auth/protected-endpoint`
+     - Method: POST
+     - Headers: 
+       - `Content-Type: application/json`
+       - `Authorization: Bearer 복사한_ID_토큰`
+
+   - 사용자 정보 조회:
+     - URL: `http://localhost:9090/api/users/me`
+     - Method: GET
+     - Headers: `Authorization: Bearer 복사한_ID_토큰`
+
+4. curl로 테스트:
+   ```bash
+   # 구글 인증 API 테스트
+   curl -X POST http://localhost:9090/auth/google-auth \
+        -H "Content-Type: application/json" \
+        -d '{"id_token":"복사한_ID_토큰","name":"사용자_이름","profile_picture":"프로필_사진_URL"}'
+
+   # 보호된 엔드포인트 테스트
+   curl -X POST http://localhost:9090/auth/protected-endpoint \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer 복사한_ID_토큰"
+
+   # 사용자 정보 조회
+   curl -X GET http://localhost:9090/api/users/me \
+        -H "Authorization: Bearer 복사한_ID_토큰"
+   ```
+
+### 주의사항
+
+1. 테스트 전 데이터베이스 마이그레이션 실행:
+   ```bash
+   docker-compose exec web alembic upgrade head
+   ```
+
+2. 인증 토큰 만료 시간:
+   - Firebase ID 토큰은 일정 시간 후 만료됩니다 (보통 1시간).
+   - 만료된 경우 다시 로그인하여 새 토큰을 얻어야 합니다.
+
+3. 브라우저 호환성:
+   - Chrome 또는 Firefox 브라우저 사용 권장
+   - 팝업 차단을 비활성화해야 구글 로그인 팝업이 정상 작동합니다.
+
+4. 네트워크 설정:
+   - 방화벽이 9090 포트를 차단하지 않는지 확인
+   - Docker 네트워크가 정상적으로 구성되어 있는지 확인
+  

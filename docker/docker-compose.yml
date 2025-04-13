@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     build:
@@ -8,13 +6,13 @@ services:
     volumes:
       - ..:/app
     ports:
-      - "8000:8000"
+      - "9090:8000"
     environment:
       - PYTHONPATH=/app
       - APP_NAME=FastAPI Firebase Auth
       - DEBUG=True
       - GOOGLE_APPLICATION_CREDENTIALS=/app/docker/firebase-adminsdk.json
-      - DATABASE_URL=postgresql://postgres:password@db:5432/mhp_db
+      - DATABASE_URL=postgresql://hch3154:admin@db:5432/mhp_db
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - db
@@ -24,8 +22,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=hch3154
+      - POSTGRES_PASSWORD=admin
       - POSTGRES_DB=mhp_db
     ports:
       - "5432:5432"
@@ -33,7 +31,7 @@ services:
   pgadmin:
     image: dpage/pgadmin4
     environment:
-      - PGADMIN_DEFAULT_EMAIL=hch3154@gamil.com
+      - PGADMIN_DEFAULT_EMAIL=hch3154@gmail.com
       - PGADMIN_DEFAULT_PASSWORD=admin
     ports:
       - "5050:80"

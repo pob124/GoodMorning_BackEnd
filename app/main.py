@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware
+import os
 
 from app.core import get_settings
 from app.api import router as api_router
@@ -15,6 +16,13 @@ app = FastAPI(
     debug=settings.DEBUG
 )
 
+# 정적 파일 마운트
+app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/templates", StaticFiles(directory="templates"), name="templates")
+
+# 템플릿 설정
+templates = Jinja2Templates(directory="templates")
+
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
@@ -24,10 +32,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 정적 파일 설정
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-
 # API 라우터 등록
 app.include_router(api_router, prefix="/api")
 
@@ -35,5 +39,9 @@ app.include_router(api_router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
 
 @app.get("/")
-async def root(request: Request):
+async def root():
+    return {"status": "API server is running", "app_name": settings.APP_NAME}
+
+@app.get("/login")
+async def login_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})

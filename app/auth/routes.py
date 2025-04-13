@@ -12,6 +12,8 @@ from app.models.database_models import User as models
 from app.auth.utils import verify_token, get_current_user
 import uuid
 from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+import datetime
 
 router = APIRouter()
 settings = get_settings()
@@ -24,17 +26,23 @@ class UserUpdate(BaseModel):
     username: Optional[str] = None
 
 @router.post("/google-auth")
-async def google_auth(user_data: UserData, db: Session = Depends(get_db)):
+async def google_auth(user_data: UserData, request: Request, db: Session = Depends(get_db)):
     try:
         # 구글에서 받은 ID 토큰 검증
         decoded_token = auth.verify_id_token(user_data.id_token)
         uid = decoded_token['uid']
         email = decoded_token.get('email', '')
         
+        # 현재 시간과 IP 주소 가져오기
+        current_time = datetime.datetime.now()
+        client_ip = request.client.host
+        
         # 데이터베이스에서 사용자 확인
         db_user = db.query(UserModel).filter(UserModel.firebase_uid == uid).first()
         if db_user:
-            # 사용자가 이미 존재함
+            # 사용자가 이미 존재함 - 마지막 로그인 시간 업데이트
+            db_user.updated_at = current_time
+            # 추가 필드가 있다면 여기서 업데이트 (last_login_at, last_login_ip 등)
             is_new_user = False
         else:
             # 사용자가 존재하지 않으면 새로 생성 (회원가입)
@@ -43,11 +51,25 @@ async def google_auth(user_data: UserData, db: Session = Depends(get_db)):
                 email=email,
                 name=user_data.name or decoded_token.get('name', ''),
                 is_active=True
+                # 추가 필드가 있다면 여기서 설정
+                # profile_picture=user_data.profile_picture
             )
             db.add(db_user)
-            db.commit()
-            db.refresh(db_user)
             is_new_user = True
+        
+        # 변경사항 커밋
+        db.commit()
+        db.refresh(db_user)
+        
+        # 로그인 이력 기록 (LoginHistory 테이블이 있다면)
+        # login_history = LoginHistory(
+        #     user_id=db_user.id,
+        #     login_time=current_time,
+        #     ip_address=client_ip,
+        #     device_info=request.headers.get('User-Agent', '')
+        # )
+        # db.add(login_history)
+        # db.commit()
             
         return {
             "success": True,
@@ -128,46 +150,6 @@ async def register(user: UserSchema):
             detail=str(e)
         )
 
-@router.get("/users/me", response_model=UserSchema)
-async def read_users_me(current_user: UserModel = Depends(get_current_user)):
-    return {
-        "id": str(current_user.id) if hasattr(current_user, "id") else None,
-        "email": current_user.email,
-        "name": current_user.name,
-        "username": getattr(current_user, "username", None),
-        "is_active": current_user.is_active
-    }
-
-@router.post("/users/me", response_model=UserSchema)
-async def update_users_me(
-    user_update: UserUpdate,
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    # 현재 사용자 정보 업데이트
-    for key, value in user_update.dict(exclude_unset=True).items():
-        setattr(current_user, key, value)
-    
-    db.commit()
-    db.refresh(current_user)
-    
-    return {
-        "id": str(current_user.id),
-        "email": current_user.email,
-        "name": current_user.name,
-        "username": getattr(current_user, "username", None),
-        "is_active": current_user.is_active
-    }
-
-@router.delete("/users/me", status_code=204)
-async def delete_users_me(
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    # 사용자 계정 비활성화 (또는 삭제)
-    current_user.is_active = False
-    db.commit()
-    return {"detail": "User account deactivated"}
 
 @router.post("/verify-token")
 async def verify_auth_token(token_data: dict = Depends(verify_token)):
@@ -204,4 +186,29 @@ async def register_user_with_token(token_data: dict = Depends(verify_token), db:
     return {
         "detail": "사용자 등록 완료",
         "user_id": str(new_user.id)
+    }
+
+@router.get("/check-users")
+async def check_users(db: Session = Depends(get_db)):
+    """데이터베이스에 사용자가 존재하는지 확인합니다."""
+    users = db.query(UserModel).all()
+    
+    if not users:
+        return {"exists": False, "count": 0, "message": "사용자 데이터가 없습니다."}
+    
+    return {
+        "exists": True,
+        "count": len(users),
+        "users": [
+            {
+                "id": str(user.id),
+                "firebase_uid": user.firebase_uid,
+                "email": user.email,
+                "name": user.name,
+                "is_active": user.is_active,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "updated_at": user.updated_at.isoformat() if user.updated_at else None
+            }
+            for user in users[:5]  # 최대 5명의 사용자만 반환
+        ]
     } 
