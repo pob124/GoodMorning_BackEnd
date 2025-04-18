@@ -2,14 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.models.database_models import User as models
 from app.core import get_settings
-from app.auth.utils import get_current_user
+from app.auth.utils import get_current_user, verify_token
 from app.core.database import get_db
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+import logging
 
 router = APIRouter()
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -39,25 +41,26 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 @router.get("/users/me", response_model=UserResponse)
-async def read_users_me(current_user: models = Depends(get_current_user)):
-    """현재 인증된 사용자 정보를 반환합니다."""
+async def read_users_me(token_data: dict = Depends(verify_token)):
+    """현재 인증된 사용자 정보를 반환합니다. DB에 저장하지 않고 토큰 정보만 사용."""
     try:
+        # 토큰에서 직접 사용자 정보 반환 (DB 조회 없음)
         return {
-            "id": str(current_user.id),
-            "email": current_user.email,
-            "name": current_user.name,
-            "username": getattr(current_user, "username", None),
-            "is_active": current_user.is_active,
-            # 추가 프로필 필드
-            "profile_picture": getattr(current_user, "profile_picture", None),
-            "bio": getattr(current_user, "bio", None),
-            "phone_number": getattr(current_user, "phone_number", None),
-            "location": getattr(current_user, "location", None),
-            "gender": getattr(current_user, "gender", None),
-            "birth_date": getattr(current_user, "birth_date", None),
-            "last_login_at": getattr(current_user, "last_login_at", None)
+            "id": token_data["firebase_uid"],  # Firebase UID를 ID로 사용
+            "email": token_data["email"],
+            "name": token_data["name"],
+            "username": None,  # Firebase에서 제공하지 않는 정보는 기본값 사용
+            "is_active": True,
+            "profile_picture": None,
+            "bio": None,
+            "phone_number": None,
+            "location": None,
+            "gender": None,
+            "birth_date": None,
+            "last_login_at": None
         }
     except Exception as e:
+        logger.error(f"Error in read_users_me: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"사용자 정보를 가져오는 중 오류 발생: {str(e)}"

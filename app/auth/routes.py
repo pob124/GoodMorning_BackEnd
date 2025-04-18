@@ -150,10 +150,18 @@ async def register(user: UserSchema):
             detail=str(e)
         )
 
-
 @router.get("/verify-token")
 async def verify_auth_token(token_data: dict = Depends(verify_token)):
     """Firebase 토큰을 검증하고 사용자 정보를 반환합니다."""
+    return {
+        "firebase_uid": token_data["firebase_uid"],
+        "email": token_data["email"],
+        "name": token_data["name"]
+    }
+
+@router.post("/verify-token")
+async def verify_auth_token_post(token_data: dict = Depends(verify_token)):
+    """Firebase 토큰을 검증하고 사용자 정보를 반환합니다. (POST 메서드)"""
     return {
         "firebase_uid": token_data["firebase_uid"],
         "email": token_data["email"],
