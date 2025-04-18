@@ -9,7 +9,7 @@ import logging
 from typing import Optional
 
 # 로깅 설정
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
@@ -17,9 +17,8 @@ firebase_app = initialize_firebase()
 
 async def verify_token(token: str = Depends(oauth2_scheme)):
     try:
-        # Firebase ID 토큰 검증
-        logger.info(f"Verifying token: {token[:10]}...")
-        decoded_token = auth.verify_id_token(token)
+        # check_revoked=False 옵션 추가, 앱 검증 강제 옵션 추가
+        decoded_token = auth.verify_id_token(token, check_revoked=False)
         uid = decoded_token['uid']
         email = decoded_token.get('email', '')
         
@@ -31,6 +30,7 @@ async def verify_token(token: str = Depends(oauth2_scheme)):
         }
     except Exception as e:
         logger.error(f"Token verification failed: {str(e)}")
+        # 오류 메시지를 더 자세히 포함
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"인증 토큰이 유효하지 않습니다: {str(e)}",
