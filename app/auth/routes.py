@@ -1,14 +1,11 @@
 from fastapi import APIRouter, HTTPException, Request, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from firebase_admin import auth
-from app.models.models import User, Token, TokenData, SignupData, UserData, User as UserSchema
-from app.models.database_models import User as UserModel
+from app.models import User, Token, TokenData, SignupData, UserData, UserDB
 from sqlalchemy.orm import Session
-from app.core.database import get_db
+from app.services import get_db, initialize_firebase
 from typing import Optional
-from app.core.firebase import initialize_firebase
-from app.core import get_settings
-from app.models.database_models import User as models
+from app.config import get_settings
 from app.auth.utils import verify_token, get_current_user
 import uuid
 from pydantic import BaseModel
@@ -38,7 +35,7 @@ async def google_auth(user_data: UserData, request: Request, db: Session = Depen
         client_ip = request.client.host
         
         # 데이터베이스에서 사용자 확인
-        db_user = db.query(UserModel).filter(UserModel.firebase_uid == uid).first()
+        db_user = db.query(UserDB).filter(UserDB.firebase_uid == uid).first()
         if db_user:
             # 사용자가 이미 존재함 - 마지막 로그인 시간 업데이트
             db_user.updated_at = current_time
@@ -46,7 +43,7 @@ async def google_auth(user_data: UserData, request: Request, db: Session = Depen
             is_new_user = False
         else:
             # 사용자가 존재하지 않으면 새로 생성 (회원가입)
-            db_user = UserModel(
+            db_user = UserDB(
                 firebase_uid=uid,
                 email=email,
                 name=user_data.name or decoded_token.get('name', ''),
@@ -130,8 +127,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-@router.post("/register", response_model=UserSchema)
-async def register(user: UserSchema):
+@router.post("/register", response_model=User)
+async def register(user: User):
     try:
         # Firebase Authentication을 통한 회원가입
         user_record = firebase_app.auth().create_user(
@@ -139,7 +136,7 @@ async def register(user: UserSchema):
             password=user.password,
             display_name=user.name
         )
-        return UserSchema(
+        return User(
             id=user_record.uid,
             email=user.email,
             name=user.name
@@ -172,7 +169,7 @@ async def verify_auth_token_post(token_data: dict = Depends(verify_token)):
 async def register_user_with_token(token_data: dict = Depends(verify_token), db: Session = Depends(get_db)):
     """인증된 Firebase 사용자를 데이터베이스에 등록합니다."""
     # 이미 존재하는 사용자인지 확인
-    existing_user = db.query(UserModel).filter(UserModel.firebase_uid == token_data["firebase_uid"]).first()
+    existing_user = db.query(UserDB).filter(UserDB.firebase_uid == token_data["firebase_uid"]).first()
     if existing_user:
         return {
             "detail": "이미 등록된 사용자입니다",
@@ -180,7 +177,7 @@ async def register_user_with_token(token_data: dict = Depends(verify_token), db:
         }
     
     # 새 사용자 생성
-    new_user = UserModel(
+    new_user = UserDB(
         firebase_uid=token_data["firebase_uid"],
         email=token_data["email"],
         name=token_data["name"],
@@ -199,7 +196,7 @@ async def register_user_with_token(token_data: dict = Depends(verify_token), db:
 @router.get("/check-users")
 async def check_users(db: Session = Depends(get_db)):
     """데이터베이스에 사용자가 존재하는지 확인합니다."""
-    users = db.query(UserModel).all()
+    users = db.query(UserDB).all()
     
     if not users:
         return {"exists": False, "count": 0, "message": "사용자 데이터가 없습니다."}

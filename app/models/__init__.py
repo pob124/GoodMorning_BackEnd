@@ -1,3 +1,5 @@
-from .models import User, Token, TokenData, SignupData, UserData
+from app.models.user_models import UserDB, User, UserData, UserProfile, Token, TokenData, SignupData, Base
 
-__all__ = ['User', 'Token', 'TokenData', 'SignupData', 'UserData'] 
+__all__ = [
+    "UserDB", "User", "UserData", "UserProfile", "Token", "TokenData", "SignupData", "Base"
+] 

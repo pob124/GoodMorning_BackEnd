@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.models.database_models import User as models
-from app.core.database import get_db
+from app.models import UserDB
+from app.services import get_db
 from sqlalchemy import text
 from typing import List
 
@@ -15,7 +15,7 @@ async def db_check(db: Session = Depends(get_db)):
         result = db.execute(text("SELECT 1"))
         if result.scalar() == 1:
             # 사용자 테이블 확인
-            users = db.query(models).limit(5).all()
+            users = db.query(UserDB).limit(5).all()
             return {
                 "status": "connected",
                 "database": "PostgreSQL",

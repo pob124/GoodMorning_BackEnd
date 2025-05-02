@@ -1,10 +1,9 @@
 from fastapi import Depends, HTTPException, status, Request as FastAPIRequest
 from fastapi.security import OAuth2PasswordBearer
 from firebase_admin import auth
-from app.models.database_models import User
-from app.core.firebase import initialize_firebase
+from app.models import UserDB as User 
 from sqlalchemy.orm import Session
-from app.core.database import get_db
+from app.services import get_db, initialize_firebase
 import logging
 from typing import Optional
 
