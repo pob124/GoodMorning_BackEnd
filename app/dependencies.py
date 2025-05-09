@@ -1,16 +1,24 @@
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.services.auth_service import AuthService
-from typing import Optional
+from app.core.firebase import verify_token, get_db
+from app.models.user_models import TokenData
 
-async def get_current_user(
-    db: Session = Depends(get_db),
-    authorization: Optional[str] = Header(None)
-) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     
-    token = authorization.split(" ")[1]
-    user = await AuthService.verify_firebase_token(token, db)
-    return user.id 
+    decoded_token = verify_token(token)
+    if decoded_token is None:
+        raise credentials_exception
+        
+    token_data = TokenData(firebase_uid=decoded_token.get("uid"))
+    if token_data.firebase_uid is None:
+        raise credentials_exception
+        
+    return token_data 

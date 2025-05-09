@@ -1,5 +1,17 @@
-from app.models.user_models import UserDB, User, UserData, UserProfile, Token, TokenData, SignupData, Base
+from app.models.user_models import User, UserBase, UserCreate, UserProfile, Token, TokenData, SignupData, Base
+from app.models.chatroom import Chatroom, Message, Coordinate, CoordinateModel
 
 __all__ = [
-    "UserDB", "User", "UserData", "UserProfile", "Token", "TokenData", "SignupData", "Base"
+    "User",
+    "UserBase",
+    "UserCreate",
+    "UserProfile",
+    "Token",
+    "TokenData",
+    "SignupData",
+    "Chatroom",
+    "Message",
+    "Coordinate",
+    "CoordinateModel",
+    "Base"
 ] 

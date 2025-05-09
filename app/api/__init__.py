@@ -1,11 +1,11 @@
 # API module 
 from fastapi import APIRouter
+from app.api.endpoints import auth, users, chatrooms, chat
 
 router = APIRouter()
 
-from . import routes
-from . import db_check
-
-# 라우터 포함
-router.include_router(routes.router, tags=["users"])
-router.include_router(db_check.router, tags=["database"]) 
+# API 라우터 등록
+router.include_router(auth.router)
+router.include_router(users.router)
+router.include_router(chatrooms.router)
+router.include_router(chat.router) 
