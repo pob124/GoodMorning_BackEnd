@@ -42,3 +42,31 @@ async def sync_user(
         db.commit()
 
     return {"success": True, "uid": uid}
+
+@router.post("/login")
+async def create_custom_token(request: dict = Body(...)):
+    """Firebase UID를 받아서 커스텀 토큰을 생성합니다."""
+    try:
+        uid = request.get("token")  # PowerShell 스크립트에서 "token" 키로 UID를 전송
+        
+        if not uid:
+            raise HTTPException(status_code=400, detail="UID is required")
+        
+        # Firebase Admin SDK로 커스텀 토큰 생성
+        custom_token = auth.create_custom_token(uid)
+        
+        # bytes를 string으로 변환
+        if isinstance(custom_token, bytes):
+            custom_token = custom_token.decode('utf-8')
+        
+        return {
+            "access_token": custom_token,
+            "token_type": "bearer"
+        }
+        
+    except Exception as e:
+        logger.error(f"커스텀 토큰 생성 실패: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to create custom token: {str(e)}"
+        )

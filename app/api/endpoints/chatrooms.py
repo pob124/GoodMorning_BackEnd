@@ -62,7 +62,7 @@ async def search_chatrooms(
             participants=user_profiles,
             connection=json.loads(chatroom.connection) if chatroom.connection else [],
             createdAt=chatroom.created_at,
-            messages=message_models
+            message=message_models #messages를 message로 변경
         ))
     
     return result
@@ -118,7 +118,7 @@ async def create_chatroom(
         participants=user_profiles,
         connection=request.connection,
         createdAt=chatroom.created_at,
-        messages=[]
+        message=[]
     )
     
     return response_chatroom
@@ -186,7 +186,7 @@ async def get_chatrooms(
             participants=user_profiles,
             connection=json.loads(chatroom.connection) if chatroom.connection else [],
             createdAt=chatroom.created_at,
-            messages=message_models
+            message=message_models
         ))
     
     return result
