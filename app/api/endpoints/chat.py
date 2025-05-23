@@ -1,11 +1,19 @@
-from fastapi import APIRouter, Depends, Body, WebSocket, WebSocketDisconnect, HTTPException, status
+from fastapi import APIRouter, Depends, Body, WebSocket, WebSocketDisconnect, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Dict
 from datetime import datetime
 import json
 
 from app.core.firebase import get_current_user_id, get_db
-from app.models.chatroom import MessageModel, MessageDB, ChatroomDB
+from app.models import Message, UserProfile
+from app.models.chatroom import MessageDB, ChatroomDB
+from app.utils.utils import (
+    get_chatroom_or_404, 
+    verify_chatroom_participant, 
+    apply_pagination, 
+    create_message, 
+    connection_manager
+)
 
 router = APIRouter(
     prefix="/chat",
@@ -13,55 +21,7 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-# WebSocket 연결 관리를 위한 클래스
-class ConnectionManager:
-    def __init__(self):
-        # room_id: {websocket: user_id}
-        self.active_connections: Dict[str, Dict[WebSocket, str]] = {}
-    
-    async def connect(self, websocket: WebSocket, room_id: str, user_id: str):
-        await websocket.accept()
-        if room_id not in self.active_connections:
-            self.active_connections[room_id] = {}
-        self.active_connections[room_id][websocket] = user_id
-    
-    def disconnect(self, websocket: WebSocket, room_id: str):
-        if room_id in self.active_connections:
-            self.active_connections[room_id].pop(websocket, None)
-            if not self.active_connections[room_id]:
-                del self.active_connections[room_id]
-    
-    async def broadcast(self, message: str, room_id: str, sender_id: str):
-        if room_id in self.active_connections:
-            for connection in self.active_connections[room_id]:
-                await connection.send_text(json.dumps({
-                    "sender_id": sender_id,
-                    "content": message,
-                    "timestamp": datetime.now().isoformat()
-                }))
-
-manager = ConnectionManager()
-
-@router.websocket("/ws/{room_id}")
-async def websocket_endpoint(websocket: WebSocket, room_id: str, token: str):
-    try:
-        # 토큰 검증
-        user_id = await get_current_user_id(token)
-        
-        # WebSocket 연결
-        await manager.connect(websocket, room_id, user_id)
-        
-        try:
-            while True:
-                data = await websocket.receive_text()
-                await manager.broadcast(data, room_id, user_id)
-        except WebSocketDisconnect:
-            manager.disconnect(websocket, room_id)
-            await manager.broadcast(f"User {user_id} left the chat", room_id, "system")
-    except Exception as e:
-        await websocket.close(code=1008)  # Policy Violation
-
-@router.get("/{room_id}", response_model=List[MessageModel], summary="채팅 내역 조회")
+@router.get("/{room_id}", response_model=List[Message], summary="채팅 내역 조회")
 async def get_chat_history(
     room_id: str,
     skip: int = 0,
@@ -78,35 +38,88 @@ async def get_chat_history(
     - **current_user_id**: 현재 로그인한 사용자 ID
     
     Returns:
-        List[MessageModel]: 채팅 메시지 목록
+        List[Message]: 채팅 메시지 목록
     """
     # 채팅방 존재 여부 확인
-    chatroom = db.query(ChatroomDB).filter(ChatroomDB.id == room_id).first()
-    if not chatroom:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chatroom not found"
-        )
+    chatroom = get_chatroom_or_404(db, room_id)
     
     # 참가자 확인
-    participants = json.loads(chatroom.participants)
-    if current_user_id not in participants:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only participants can view chat history"
-        )
+    verify_chatroom_participant(chatroom, current_user_id)
     
     # 메시지 조회
-    messages = db.query(MessageDB)\
+    query = db.query(MessageDB)\
         .filter(MessageDB.chatroom_id == room_id)\
-        .order_by(MessageDB.created_at.desc())\
-        .offset(skip)\
-        .limit(limit)\
-        .all()
+        .order_by(MessageDB.timestamp.desc())
+    
+    messages_db = apply_pagination(query, skip, limit).all()
+    
+    # DB 객체 목록을 Pydantic 모델 목록으로 변환
+    messages = [
+        Message(
+            id=msg.id,
+            senderId=msg.sender_id,
+            content=msg.content,
+            timestamp=msg.timestamp
+        ) for msg in messages_db
+    ]
     
     return messages
 
-@router.post("/{room_id}", response_model=MessageModel, status_code=status.HTTP_201_CREATED, summary="메시지 전송")
+@router.get("/search", response_model=List[Message], summary="채팅방 히스토리 검색")
+async def search_messages(
+    keyword: str = Query(None, description="검색할 키워드"),
+    current_user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    키워드 기반으로 채팅 메시지를 검색합니다.
+    
+    - **keyword**: 검색할 메시지 키워드
+    - **current_user_id**: 현재 로그인한 사용자 ID
+    
+    Returns:
+        List[Message]: 검색된 메시지 목록
+    """
+    # 키워드가 없으면 빈 목록 반환
+    if not keyword:
+        return []
+    
+    # 현재 사용자가 참여한 채팅방 목록 조회
+    chatrooms = db.query(ChatroomDB).all()
+    user_chatrooms = []
+    
+    for chatroom in chatrooms:
+        try:
+            participants = json.loads(chatroom.participants)
+            if current_user_id in participants:
+                user_chatrooms.append(chatroom.id)
+        except:
+            continue
+    
+    if not user_chatrooms:
+        return []
+    
+    # 검색 쿼리 실행
+    query = db.query(MessageDB)\
+        .filter(MessageDB.chatroom_id.in_(user_chatrooms))\
+        .filter(MessageDB.content.contains(keyword))\
+        .order_by(MessageDB.timestamp.desc())
+    
+    messages_db = query.limit(50).all()
+    
+    # DB 객체 목록을 Pydantic 모델 목록으로 변환
+    messages = [
+        Message(
+            id=msg.id,
+            senderId=msg.sender_id,
+            content=msg.content,
+            timestamp=msg.timestamp
+        ) for msg in messages_db
+    ]
+    
+    return messages
+
+@router.post("/{room_id}", response_model=Message, status_code=status.HTTP_201_CREATED, summary="메시지 전송")
 async def send_message(
     room_id: str,
     message: str = Body(..., embed=True),
@@ -121,36 +134,47 @@ async def send_message(
     - **current_user_id**: 현재 로그인한 사용자 ID
     
     Returns:
-        MessageModel: 생성된 메시지 정보
+        Message: 생성된 메시지 정보
     """
     # 채팅방 존재 여부 확인
-    chatroom = db.query(ChatroomDB).filter(ChatroomDB.id == room_id).first()
-    if not chatroom:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chatroom not found"
-        )
+    chatroom = get_chatroom_or_404(db, room_id)
     
     # 참가자 확인
-    participants = json.loads(chatroom.participants)
-    if current_user_id not in participants:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only participants can send messages"
-        )
+    verify_chatroom_participant(chatroom, current_user_id)
     
     # 메시지 생성
-    db_message = MessageDB(
-        content=message,
-        chatroom_id=room_id,
-        sender_id=current_user_id,
-        created_at=datetime.utcnow()
-    )
-    db.add(db_message)
-    db.commit()
-    db.refresh(db_message)
+    db_message = create_message(db, message, room_id, current_user_id)
+    
+    # WebSocket 연결된 사용자들에게 메시지 브로드캐스트
+    await connection_manager.broadcast_message(db_message, room_id)
     
     return db_message
+
+@router.get("/{room_id}/active-users", summary="현재 접속 중인 사용자 목록")
+async def get_active_users(
+    room_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    채팅방에 현재 접속 중인 사용자 목록을 조회합니다.
+    
+    - **room_id**: 채팅방 ID
+    - **current_user_id**: 현재 로그인한 사용자 ID
+    
+    Returns:
+        List[str]: 접속 중인 사용자 ID 목록
+    """
+    # 채팅방 존재 여부 확인
+    chatroom = get_chatroom_or_404(db, room_id)
+    
+    # 참가자 확인
+    verify_chatroom_participant(chatroom, current_user_id)
+    
+    # 접속 중인 사용자 목록 조회
+    active_users = connection_manager.get_active_users(room_id)
+    
+    return {"active_users": active_users}
 
 @router.patch("/{room_id}/messages/{message_id}/read", summary="메시지 읽음 처리")
 async def mark_message_as_read(
@@ -170,20 +194,10 @@ async def mark_message_as_read(
         dict: 성공 상태
     """
     # 채팅방 존재 여부 확인
-    chatroom = db.query(ChatroomDB).filter(ChatroomDB.id == room_id).first()
-    if not chatroom:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chatroom not found"
-        )
+    chatroom = get_chatroom_or_404(db, room_id)
     
     # 참가자 확인
-    participants = json.loads(chatroom.participants)
-    if current_user_id not in participants:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only participants can mark messages as read"
-        )
+    verify_chatroom_participant(chatroom, current_user_id)
     
     # 메시지 존재 여부 확인
     message = db.query(MessageDB)\

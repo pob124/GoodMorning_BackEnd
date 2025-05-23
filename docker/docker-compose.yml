@@ -1,42 +1,72 @@
 services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/www:/var/www/html
+    depends_on:
+      - web
+    networks:
+      - mhp_network
+    restart: always
+
   web:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     volumes:
       - ..:/app
-    ports:
-      - "9090:8000"
+    expose:
+      - "8000"
     environment:
       - PYTHONPATH=/app
-      - APP_NAME=FastAPI Firebase Auth
-      - DEBUG=True
+      - APP_NAME=Morning Hiking Partner API
+      - DEBUG=${DEBUG:-False}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/docker/firebase-adminsdk.json
-      - DATABASE_URL=postgresql://hch3154:admin@db:5432/mhp_db
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-mhp_db}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - db
+    networks:
+      - mhp_network
+    restart: always
 
   db:
     image: postgres:13
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_USER=hch3154
-      - POSTGRES_PASSWORD=admin
-      - POSTGRES_DB=mhp_db
-    ports:
-      - "5432:5432"
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-mhp_db}
+    expose:
+      - "5432"
+    networks:
+      - mhp_network
+    restart: always
 
   pgadmin:
     image: dpage/pgadmin4
     environment:
       - PGADMIN_DEFAULT_EMAIL=hch3154@gmail.com
-      - PGADMIN_DEFAULT_PASSWORD=admin
-    ports:
-      - "8080:80"
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin}
+    expose:
+      - "80"
     depends_on:
       - db
+    networks:
+      - mhp_network
+    restart: always
+
+networks:
+  mhp_network:
+    driver: bridge
 
 volumes:
   postgres_data: 

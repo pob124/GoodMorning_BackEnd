@@ -24,37 +24,42 @@ async def get_user_profile(
     
     return UserProfile(
         uid=user.firebase_uid,
-        nickname=user.name,
+        nickname=user.nickname,
         bio=user.bio,
-        profileImageUrl=user.profile_picture,
+        profileImageUrl=user.profile_image_url,
         likes=user.likes
     )
 
 # [프로필] 프로필 정보 수정
 @router.patch("/profile", response_model=UserProfile, summary="프로필 수정")
 async def update_user_profile(
-    update_data: dict = Body(...),
+    profile_update: UserProfile,
     current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
-    """사용자의 bio 및 nickname 정보를 수정합니다."""
+    """사용자의 프로필 정보를 수정합니다."""
     user = db.query(UserDB).filter(UserDB.firebase_uid == current_user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
-    if "bio" in update_data:
-        user.bio = update_data["bio"]
-    if "nickname" in update_data:
-        user.name = update_data["nickname"]
-
+    
+    update_data = profile_update.dict(exclude_unset=True)
+    # uid 필드는 제외
+    update_data.pop("uid", None)
+    for field, value in update_data.items():
+        # UserDB 모델과 UserProfile 필드명이 다를 수 있으니 매핑 필요
+        if field == "nickname":
+            setattr(user, "nickname", value)
+        elif field == "profileImageUrl":
+            setattr(user, "profile_image_url", value)
+        else:
+            setattr(user, field, value)
     db.commit()
     db.refresh(user)
-
     return UserProfile(
         uid=user.firebase_uid,
-        nickname=user.name,
+        nickname=user.nickname,
         bio=user.bio,
-        profileImageUrl=user.profile_picture,
+        profileImageUrl=user.profile_image_url,
         likes=user.likes
     )
 
@@ -70,9 +75,9 @@ async def get_users(
     return [
         UserProfile(
             uid=user.firebase_uid,
-            nickname=user.name,
+            nickname=user.nickname,
             bio=user.bio,
-            profileImageUrl=user.profile_picture,
+            profileImageUrl=user.profile_image_url,
             likes=user.likes
         )
         for user in users

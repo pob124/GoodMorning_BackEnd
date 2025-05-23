@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     
     # Database
     POSTGRES_SERVER: str = "db"
-    POSTGRES_USER: str = "hch3154"
-    POSTGRES_PASSWORD: str = "admin"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "mhp_db"
     SQLALCHEMY_DATABASE_URL: Optional[str] = None
 
