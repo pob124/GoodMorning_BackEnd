@@ -34,9 +34,8 @@ def get_db():
         db.close()
 
 # 토큰 검증 함수
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+async def verify_token(token: str):
     try:
-        token = credentials.credentials
         logger.info(f"Verifying token: {token[:20]}...")
         decoded_token = auth.verify_id_token(token)
         logger.info(f"Token verified successfully. UID: {decoded_token.get('uid')}")

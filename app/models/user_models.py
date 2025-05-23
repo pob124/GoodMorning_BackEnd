@@ -86,7 +86,7 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     """토큰 데이터 스키마"""
     email: Optional[str] = None
-
+    firebase_uid: str
 class SignupData(BaseModel):
     email: str
     password: str
