@@ -2,7 +2,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from app.core.database import get_db
+from app.db import SessionLocal
 from app.core.config import settings
 import firebase_admin
 from firebase_admin import credentials, auth
@@ -25,10 +25,17 @@ def initialize_firebase():
         firebase_admin.initialize_app(cred)
         logger.info("Firebase Admin SDK initialized successfully")
 
-# 토큰 검증 함수
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+# 데이터베이스 세션 의존성
+def get_db():
+    db = SessionLocal()
     try:
-        token = credentials.credentials
+        yield db
+    finally:
+        db.close()
+
+# 토큰 검증 함수
+async def verify_token(token: str):
+    try:
         logger.info(f"Verifying token: {token[:20]}...")
         decoded_token = auth.verify_id_token(token)
         logger.info(f"Token verified successfully. UID: {decoded_token.get('uid')}")
