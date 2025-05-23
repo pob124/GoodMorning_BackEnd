@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, Body, WebSocket, WebSocketDisconnect, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Dict
+from app.schemas.chat import MessageRequest
+from app.schemas.chatroom import Message
+
 from datetime import datetime
 import json
 
 from app.core.firebase import get_current_user_id, get_db
-from app.models import Message, UserProfile
 from app.models.chatroom import MessageDB, ChatroomDB
 from app.utils.utils import (
     get_chatroom_or_404, 
@@ -119,10 +121,10 @@ async def search_messages(
     
     return messages
 
-@router.post("/{room_id}", response_model=Message, status_code=status.HTTP_201_CREATED, summary="메시지 전송")
+@router.post("/{room_id}", response_model=Message, status_code=status.HTTP_201_CREATED)
 async def send_message(
     room_id: str,
-    message: str = Body(..., embed=True),
+    message_request: MessageRequest,
     current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
@@ -143,12 +145,18 @@ async def send_message(
     verify_chatroom_participant(chatroom, current_user_id)
     
     # 메시지 생성
-    db_message = create_message(db, message, room_id, current_user_id)
+    db_message = create_message(db, message_request.content, room_id, current_user_id)
     
     # WebSocket 연결된 사용자들에게 메시지 브로드캐스트
     await connection_manager.broadcast_message(db_message, room_id)
     
-    return db_message
+    # DB 모델을 API 모델로 변환
+    return Message(
+        id=db_message.id,
+        senderId=db_message.sender_id,
+        content=db_message.content,
+        timestamp=db_message.timestamp
+    )
 
 @router.get("/{room_id}/active-users", summary="현재 접속 중인 사용자 목록")
 async def get_active_users(

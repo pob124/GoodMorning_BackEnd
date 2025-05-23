@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, Body, Query, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
+from app.schemas.chatroom import CreateChatroomRequest, Chatroom, ChatroomFilter, Coordinate, UserProfile, Message
+
 from app.core.firebase import get_db, get_current_user_id
-from app.models import Chatroom, User, Coordinate, UserProfile
-from app.models.chatroom import MessageDB, ChatroomDB, ChatroomFilter, MessageCreate, ChatroomCreate as ChatroomCreateModel
+from app.models.user_models import UserDB
+from app.models.chatroom import MessageDB, ChatroomDB
 from app.utils.utils import get_chatroom_or_404, apply_pagination, filter_chatrooms, create_message, verify_chatroom_participant, connection_manager
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
 import json
 import uuid
 from datetime import datetime
@@ -15,11 +16,6 @@ router = APIRouter(
     tags=["채팅방"],
     responses={404: {"description": "Not found"}},
 )
-
-class CreateChatroomRequest(BaseModel):
-    title: str = Field(..., description="채팅방 제목")
-    participants: List[str] = Field(..., description="참여자 UID 목록")
-    connection: List[Coordinate] = Field(..., description="위치 정보")
 
 # [채팅방] 조건에 맞는 채팅방 목록(검색) 조회
 @router.get("/search", response_model=List[Chatroom])
@@ -48,13 +44,24 @@ async def search_chatrooms(
         participant_ids = json.loads(chatroom.participants) if chatroom.participants else []
         user_profiles = []
         for uid in participant_ids:
-            user = db.query(User).filter(User.firebase_uid == uid).first()
+            user = db.query(UserDB).filter(UserDB.firebase_uid == uid).first()
             if user:
-                user_profiles.append(UserProfile.from_db(user))
+                user_profiles.append(UserProfile(
+                    uid=user.firebase_uid,
+                    nickname=user.name,
+                    bio=user.bio,
+                    profileImageUrl=user.profile_picture,
+                    likes=user.likes or 0
+                ))
         
         # 최근 메시지 조회
         messages = db.query(MessageDB).filter(MessageDB.chatroom_id == chatroom.id).order_by(MessageDB.timestamp.desc()).limit(10).all()
-        message_models = [msg.to_api_model() for msg in messages]
+        message_models = [Message(
+            id=msg.id,
+            senderId=msg.sender_id,
+            content=msg.content,
+            timestamp=msg.timestamp
+        ) for msg in messages]
         
         result.append(Chatroom(
             id=str(chatroom.id),
@@ -62,7 +69,7 @@ async def search_chatrooms(
             participants=user_profiles,
             connection=json.loads(chatroom.connection) if chatroom.connection else [],
             createdAt=chatroom.created_at,
-            message=message_models #messages를 message로 변경
+            Message=message_models  # API.yaml에 맞춰 "Message"로 변경
         ))
     
     return result
@@ -79,8 +86,8 @@ async def create_chatroom(
     participants = [current_user_id]  # 생성자는 항상 참여자에 포함
     
     for uid in request.participants:
-        if uid != current_user_id:  # 생성자는 이미 추가됨
-            user = db.query(User).filter(User.firebase_uid == uid).first()
+        if uid != current_user_id:
+            user = db.query(UserDB).filter(UserDB.firebase_uid == uid).first()
             if not user:
                 raise HTTPException(status_code=404, detail=f"User {uid} not found")
             participants.append(uid)
@@ -107,9 +114,15 @@ async def create_chatroom(
     # 참가자 정보 조회
     user_profiles = []
     for uid in participants:
-        user = db.query(User).filter(User.firebase_uid == uid).first()
+        user = db.query(UserDB).filter(UserDB.firebase_uid == uid).first()
         if user:
-            user_profiles.append(UserProfile.from_db(user))
+            user_profiles.append(UserProfile(
+                uid=user.firebase_uid,
+                nickname=user.name,
+                bio=user.bio,
+                profileImageUrl=user.profile_picture,
+                likes=user.likes or 0
+            ))
     
     # DB 객체를 Pydantic 모델에 맞게 변환
     response_chatroom = Chatroom(
@@ -118,7 +131,7 @@ async def create_chatroom(
         participants=user_profiles,
         connection=request.connection,
         createdAt=chatroom.created_at,
-        message=[]
+        Message=[]  # API.yaml에 맞춰 "Message"로 변경
     )
     
     return response_chatroom
@@ -136,13 +149,24 @@ async def get_chatroom(
     participant_ids = json.loads(chatroom.participants) if chatroom.participants else []
     user_profiles = []
     for uid in participant_ids:
-        user = db.query(User).filter(User.firebase_uid == uid).first()
+        user = db.query(UserDB).filter(UserDB.firebase_uid == uid).first()
         if user:
-            user_profiles.append(UserProfile.from_db(user))
+            user_profiles.append(UserProfile(
+                uid=user.firebase_uid,
+                nickname=user.name,
+                bio=user.bio,
+                profileImageUrl=user.profile_picture,
+                likes=user.likes or 0
+            ))
     
     # 최근 메시지 조회
     messages = db.query(MessageDB).filter(MessageDB.chatroom_id == chatroom.id).order_by(MessageDB.timestamp.desc()).limit(10).all()
-    message_models = [msg.to_api_model() for msg in messages]
+    message_models = [Message(
+        id=msg.id,
+        senderId=msg.sender_id,
+        content=msg.content,
+        timestamp=msg.timestamp
+    ) for msg in messages]
     
     # DB 객체를 Pydantic 모델로 변환
     return Chatroom(
@@ -151,7 +175,7 @@ async def get_chatroom(
         participants=user_profiles,
         connection=json.loads(chatroom.connection) if chatroom.connection else [],
         createdAt=chatroom.created_at,
-        message=message_models  # messages를 message로 변경
+        Message=message_models  # API.yaml에 맞춰 "Message"로 변경
     )
 
 # [채팅방] 활성화된 채팅방 목록 조회
@@ -172,13 +196,24 @@ async def get_chatrooms(
         participant_ids = json.loads(chatroom.participants) if chatroom.participants else []
         user_profiles = []
         for uid in participant_ids:
-            user = db.query(User).filter(User.firebase_uid == uid).first()
+            user = db.query(UserDB).filter(UserDB.firebase_uid == uid).first()
             if user:
-                user_profiles.append(UserProfile.from_db(user))
+                user_profiles.append(UserProfile(
+                    uid=user.firebase_uid,
+                    nickname=user.name,
+                    bio=user.bio,
+                    profileImageUrl=user.profile_picture,
+                    likes=user.likes or 0
+                ))
         
         # 최근 메시지 조회
         messages = db.query(MessageDB).filter(MessageDB.chatroom_id == chatroom.id).order_by(MessageDB.timestamp.desc()).limit(10).all()
-        message_models = [msg.to_api_model() for msg in messages]
+        message_models = [Message(
+            id=msg.id,
+            senderId=msg.sender_id,
+            content=msg.content,
+            timestamp=msg.timestamp
+        ) for msg in messages]
         
         result.append(Chatroom(
             id=str(chatroom.id),
@@ -186,7 +221,7 @@ async def get_chatrooms(
             participants=user_profiles,
             connection=json.loads(chatroom.connection) if chatroom.connection else [],
             createdAt=chatroom.created_at,
-            message=message_models
+            Message=message_models  # API.yaml에 맞춰 "Message"로 변경
         ))
     
     return result

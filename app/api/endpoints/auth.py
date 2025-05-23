@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordBearer
 from app.core.firebase import verify_token, get_db, auth
 from app.models.user_models import Token, TokenData, UserDB
+from app.schemas.auth import LoginRequest, TokenResponse, TokenData
 from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -43,11 +44,11 @@ async def sync_user(
 
     return {"success": True, "uid": uid}
 
-@router.post("/login")
-async def create_custom_token(request: dict = Body(...)):
-    """Firebase UID를 받아서 커스텀 토큰을 생성합니다."""
+
+@router.post("/login", response_model=TokenResponse)
+async def create_custom_token(request: LoginRequest):
     try:
-        uid = request.get("token")  # PowerShell 스크립트에서 "token" 키로 UID를 전송
+        uid = request.token
         
         if not uid:
             raise HTTPException(status_code=400, detail="UID is required")
