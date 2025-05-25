@@ -10,6 +10,7 @@ import time
 import os
 from starlette.middleware.base import BaseHTTPMiddleware
 import uvicorn
+from fastapi.openapi.utils import get_openapi
 
 # 로깅 설정
 logging.basicConfig(
@@ -25,7 +26,32 @@ logger = logging.getLogger("mhp-api")
 # 애플리케이션 초기화
 app = FastAPI(
     title="Project GoodMorning API",
-    description="Project GoodMorning Application API v1.0.0",
+    description="""
+    Project GoodMorning Application API v1.0.0
+    
+    ## Features
+    
+    * **REST API**: 표준 HTTP 엔드포인트
+    * **WebSocket**: 실시간 채팅 및 알림
+    * **Firebase Auth**: 인증 및 권한 관리
+    * **PostgreSQL**: 데이터 저장소
+    
+    ## WebSocket Support
+    
+    이 API는 실시간 채팅을 위한 WebSocket 엔드포인트를 제공합니다:
+    
+    **엔드포인트**: `ws://localhost/api/ws/chat/{room_id}`
+    
+    **참고**: WebSocket 엔드포인트는 Swagger UI에서 완전히 테스트할 수 없습니다. 
+    WebSocket 클라이언트 도구나 JavaScript를 사용하여 테스트하세요.
+    
+    ## API Documentation
+    
+    * **Swagger UI**: `/api/docs` (이 페이지)
+    * **ReDoc**: `/api/redoc`
+    * **OpenAPI JSON**: `/api/openapi.json`
+    """,
+    version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json"
@@ -155,6 +181,7 @@ async def root():
             <div class="links">
                 <a href="/api/docs">Swagger UI Documentation</a>
                 <a href="/api/redoc">ReDoc Documentation</a>
+                <a href="/static/websocket_test.html">WebSocket 테스트</a>
                 <a href="/pgadmin/">PgAdmin</a>
             </div>
         </body>

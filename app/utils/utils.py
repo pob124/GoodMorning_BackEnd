@@ -65,9 +65,7 @@ class ConnectionManager:
         self.active_connections: Dict[str, Dict[str, WebSocket]] = {}
     
     async def connect(self, websocket: WebSocket, room_id: str, user_id: str):
-        """WebSocket 연결을 수락하고 등록합니다."""
-        await websocket.accept()
-        
+        """WebSocket 연결을 등록합니다. (accept는 호출자에서 처리)"""
         # 채팅방이 없으면 생성
         if room_id not in self.active_connections:
             self.active_connections[room_id] = {}
@@ -135,6 +133,21 @@ class ConnectionManager:
         for user_id, websocket in self.active_connections[room_id].items():
             try:
                 await websocket.send_text(json.dumps(message_data))
+            except:
+                # 오류 발생 시 연결 해제
+                self.disconnect(websocket, room_id)
+
+    async def broadcast_structured_message(self, message_obj, room_id: str):
+        """채팅방의 모든 연결된 클라이언트에게 구조화된 메시지를 브로드캐스트합니다."""
+        if room_id not in self.active_connections:
+            return
+        
+        # Pydantic 모델을 JSON으로 변환
+        message_json = message_obj.model_dump_json()
+        
+        for user_id, websocket in self.active_connections[room_id].items():
+            try:
+                await websocket.send_text(message_json)
             except:
                 # 오류 발생 시 연결 해제
                 self.disconnect(websocket, room_id)

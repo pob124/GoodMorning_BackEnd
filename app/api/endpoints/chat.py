@@ -23,50 +23,6 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-@router.get("/{room_id}", response_model=List[Message], summary="채팅 내역 조회")
-async def get_chat_history(
-    room_id: str,
-    skip: int = 0,
-    limit: int = 50,
-    current_user_id: str = Depends(get_current_user_id),
-    db: Session = Depends(get_db)
-):
-    """
-    특정 채팅방의 메시지 내역을 조회합니다.
-    
-    - **room_id**: 채팅방 ID
-    - **skip**: 건너뛸 메시지 수
-    - **limit**: 가져올 메시지 수
-    - **current_user_id**: 현재 로그인한 사용자 ID
-    
-    Returns:
-        List[Message]: 채팅 메시지 목록
-    """
-    # 채팅방 존재 여부 확인
-    chatroom = get_chatroom_or_404(db, room_id)
-    
-    # 참가자 확인
-    verify_chatroom_participant(chatroom, current_user_id)
-    
-    # 메시지 조회
-    query = db.query(MessageDB)\
-        .filter(MessageDB.chatroom_id == room_id)\
-        .order_by(MessageDB.timestamp.desc())
-    
-    messages_db = apply_pagination(query, skip, limit).all()
-    
-    # DB 객체 목록을 Pydantic 모델 목록으로 변환
-    messages = [
-        Message(
-            id=msg.id,
-            senderId=msg.sender_id,
-            content=msg.content,
-            timestamp=msg.timestamp
-        ) for msg in messages_db
-    ]
-    
-    return messages
-
 @router.get("/search", response_model=List[Message], summary="채팅방 히스토리 검색")
 async def search_messages(
     keyword: str = Query(None, description="검색할 키워드"),
@@ -108,6 +64,50 @@ async def search_messages(
         .order_by(MessageDB.timestamp.desc())
     
     messages_db = query.limit(50).all()
+    
+    # DB 객체 목록을 Pydantic 모델 목록으로 변환
+    messages = [
+        Message(
+            id=msg.id,
+            senderId=msg.sender_id,
+            content=msg.content,
+            timestamp=msg.timestamp
+        ) for msg in messages_db
+    ]
+    
+    return messages
+
+@router.get("/{room_id}", response_model=List[Message], summary="채팅 내역 조회")
+async def get_chat_history(
+    room_id: str,
+    skip: int = 0,
+    limit: int = 50,
+    current_user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    특정 채팅방의 메시지 내역을 조회합니다.
+    
+    - **room_id**: 채팅방 ID
+    - **skip**: 건너뛸 메시지 수
+    - **limit**: 가져올 메시지 수
+    - **current_user_id**: 현재 로그인한 사용자 ID
+    
+    Returns:
+        List[Message]: 채팅 메시지 목록
+    """
+    # 채팅방 존재 여부 확인
+    chatroom = get_chatroom_or_404(db, room_id)
+    
+    # 참가자 확인
+    verify_chatroom_participant(chatroom, current_user_id)
+    
+    # 메시지 조회
+    query = db.query(MessageDB)\
+        .filter(MessageDB.chatroom_id == room_id)\
+        .order_by(MessageDB.timestamp.desc())
+    
+    messages_db = apply_pagination(query, skip, limit).all()
     
     # DB 객체 목록을 Pydantic 모델 목록으로 변환
     messages = [

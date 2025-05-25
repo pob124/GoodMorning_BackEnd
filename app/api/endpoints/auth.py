@@ -1,17 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordBearer
 from app.core.firebase import verify_token, get_db, auth
-from app.models.user_models import Token, TokenData, UserDB
+from app.models.user_models import Token, UserDB
 from app.schemas.auth import LoginRequest, TokenResponse, TokenData
-from typing import Optional
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import logging
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # 로깅 설정
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["인증"])

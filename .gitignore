@@ -1,6 +1,7 @@
 # Firebase
 docker/*firebase-adminsdk*.json
 !docker/firebase-adminsdk-sample.json
+firebase_token.json
 .env
 .env.local
 .env.development

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { 
+            background-color: #6c757d; 
+            cursor: not-allowed; 
+        }
+        .disconnect-btn { background-color: #dc3545; }
+        .disconnect-btn:hover { background-color: #c82333; }
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f8f9fa;
+            white-space: pre-wrap;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .sent { background-color: #e3f2fd; }
+        .received { background-color: #f1f8e9; }
+        .error { background-color: #ffebee; color: #c62828; }
+        .system { background-color: #fff3e0; color: #ef6c00; }
+    </style>
+</head>
+<body>
+    <h1>WebSocket 연결 테스트</h1>
+    
+    <div class="container">
+        <h2>연결 설정</h2>
+        <div>
+            <label>채팅방 ID:</label>
+            <input type="text" id="roomId" placeholder="예: test-room-123" value="test-room">
+        </div>
+        <div>
+            <label>JWT 토큰 (Firebase ID Token):</label>
+            <input type="text" id="token" placeholder="Firebase ID Token을 입력하세요">
+        </div>
+        <div id="connectionStatus" class="status disconnected">연결 끊김</div>
+        <button id="connectBtn">연결</button>
+        <button id="disconnectBtn" class="disconnect-btn" disabled>연결 끊기</button>
+    </div>
+
+    <div class="container">
+        <h2>메시지 전송</h2>
+        <p><strong>주의:</strong> 메시지 전송은 REST API를 사용하세요: <code>POST /api/chat/{room_id}</code></p>
+        <p>WebSocket은 실시간 알림 수신 전용입니다.</p>
+        <textarea id="messageInput" placeholder="JSON 메시지를 입력하세요 (예: ping, get_active_users)" rows="3"></textarea>
+        <button id="sendBtn" disabled>JSON 메시지 전송</button>
+        <button id="pingBtn" disabled>Ping 전송</button>
+        <button id="getUsersBtn" disabled>활성 사용자 조회</button>
+    </div>
+
+    <div class="container">
+        <h2>수신된 메시지</h2>
+        <div id="messages"></div>
+    </div>
+
+    <div class="container">
+        <h2>빠른 테스트</h2>
+        <button onclick="sendAuthMessage()">인증 메시지 전송</button>
+        <button onclick="sendTestMessage()">테스트 메시지 전송</button>
+        <button onclick="checkServerStatus()">서버 상태 확인</button>
+    </div>
+
+    <script>
+        let ws = null;
+        let connected = false;
+
+        const roomIdInput = document.getElementById('roomId');
+        const tokenInput = document.getElementById('token');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const pingBtn = document.getElementById('pingBtn');
+        const getUsersBtn = document.getElementById('getUsersBtn');
+
+        function updateConnectionStatus(status) {
+            connected = status;
+            connectionStatus.textContent = status ? '연결됨' : '연결 끊김';
+            connectionStatus.className = status ? 'status connected' : 'status disconnected';
+            
+            connectBtn.disabled = status;
+            disconnectBtn.disabled = !status;
+            sendBtn.disabled = !status;
+            pingBtn.disabled = !status;
+            getUsersBtn.disabled = !status;
+        }
+
+        function addMessage(message, type = 'received') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function connect() {
+            const roomId = roomIdInput.value.trim();
+            if (!roomId) {
+                alert('채팅방 ID를 입력해주세요.');
+                return;
+            }
+
+            const wsUrl = `ws://localhost/api/ws/chat/${roomId}`;
+            addMessage(`연결 시도: ${wsUrl}`, 'system');
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = function(event) {
+                addMessage('WebSocket 연결이 수립되었습니다.', 'system');
+                updateConnectionStatus(true);
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    addMessage(`수신: ${JSON.stringify(data, null, 2)}`, 'received');
+                } catch (e) {
+                    addMessage(`수신 (텍스트): ${event.data}`, 'received');
+                }
+            };
+
+            ws.onclose = function(event) {
+                addMessage(`연결이 종료되었습니다. 코드: ${event.code}`, 'system');
+                updateConnectionStatus(false);
+            };
+
+            ws.onerror = function(error) {
+                addMessage(`오류 발생: ${error}`, 'error');
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || !connected) return;
+
+            try {
+                // JSON 형태로 파싱 시도
+                const jsonMessage = JSON.parse(message);
+                ws.send(message);
+                addMessage(`전송: ${message}`, 'sent');
+            } catch (e) {
+                // JSON이 아니면 일반 텍스트 메시지로 전송
+                const chatMessage = {
+                    type: "message",
+                    content: message
+                };
+                ws.send(JSON.stringify(chatMessage));
+                addMessage(`전송: ${JSON.stringify(chatMessage)}`, 'sent');
+            }
+            
+            messageInput.value = '';
+        }
+
+        function sendAuthMessage() {
+            const token = tokenInput.value.trim();
+            if (!token) {
+                alert('JWT 토큰을 입력해주세요.');
+                return;
+            }
+            
+            const authMessage = {
+                type: "auth",
+                token: token
+            };
+            
+            if (ws && connected) {
+                ws.send(JSON.stringify(authMessage));
+                addMessage(`인증 전송: ${JSON.stringify(authMessage)}`, 'sent');
+            } else {
+                alert('먼저 WebSocket에 연결해주세요.');
+            }
+        }
+
+        function sendTestMessage() {
+            const testMessage = {
+                type: "ping"
+            };
+            
+            if (ws && connected) {
+                ws.send(JSON.stringify(testMessage));
+                addMessage(`테스트 Ping 전송: ${JSON.stringify(testMessage)}`, 'sent');
+            } else {
+                alert('먼저 WebSocket에 연결해주세요.');
+            }
+        }
+
+        function sendPing() {
+            const pingMessage = { type: "ping" };
+            
+            if (ws && connected) {
+                ws.send(JSON.stringify(pingMessage));
+                addMessage(`Ping 전송: ${JSON.stringify(pingMessage)}`, 'sent');
+            }
+        }
+
+        function getActiveUsers() {
+            const getUsersMessage = { type: "get_active_users" };
+            
+            if (ws && connected) {
+                ws.send(JSON.stringify(getUsersMessage));
+                addMessage(`활성 사용자 요청: ${JSON.stringify(getUsersMessage)}`, 'sent');
+            }
+        }
+
+        async function checkServerStatus() {
+            try {
+                const roomId = roomIdInput.value.trim() || 'test-room';
+                const response = await fetch(`/api/ws/status/${roomId}`);
+                const data = await response.json();
+                addMessage(`서버 상태: ${JSON.stringify(data, null, 2)}`, 'system');
+            } catch (error) {
+                addMessage(`서버 상태 확인 오류: ${error.message}`, 'error');
+            }
+        }
+
+        // 이벤트 리스너
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        sendBtn.addEventListener('click', sendMessage);
+        pingBtn.addEventListener('click', sendPing);
+        getUsersBtn.addEventListener('click', getActiveUsers);
+
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // 초기 상태 설정
+        updateConnectionStatus(false);
+        addMessage('WebSocket 테스트 페이지가 로드되었습니다.', 'system');
+        addMessage('1. 채팅방 ID와 JWT 토큰을 입력하세요.', 'system');
+        addMessage('2. "연결" 버튼을 클릭하세요.', 'system');
+        addMessage('3. "인증 메시지 전송" 버튼을 클릭하여 인증하세요.', 'system');
+        addMessage('4. Ping/Pong 및 활성 사용자 조회를 테스트하세요.', 'system');
+        addMessage('⚠️ 메시지 전송은 POST /api/chat/{room_id}를 사용하세요!', 'system');
+    </script>
+</body>
+</html> 
