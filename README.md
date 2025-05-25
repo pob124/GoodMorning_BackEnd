@@ -15,42 +15,8 @@
 
 1. 저장소 복제:
 ```bash
-git clone https://github.com/yourusername/morning-hiking-partner.git
-cd morning-hiking-partner
-```
-
-2. 가상 환경 설정:
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate  # Windows
-```
-
-3. 의존성 설치:
-```bash
-pip install -r requirements.txt
-```
-
-4. 환경 변수 설정:
-`.env` 파일을 생성하고 필요한 환경 변수를 설정합니다:
-```
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_NAME=mhp_db
-DB_HOST=localhost
-FIREBASE_CREDENTIALS_PATH=path/to/firebase-credentials.json
-```
-
-5. 데이터베이스 마이그레이션:
-```bash
-alembic upgrade head
-```
-
-### 실행 방법
-
-개발 서버 실행:
-```bash
-uvicorn app.main:app --reload
+git https://github.com/pob124/GoodMorning_BackEnd
+cd GoodMorning_BackEnd
 ```
 
 **Docker 환경에서 실행:**
@@ -146,7 +112,7 @@ param(
 )
 
 # Firebase API 키 (여기에 실제 키 입력)
-$FIREBASE_API_KEY = "AIzaSyDRaQSVa4st5HGk9w9-v02wt4XvI9PP38k"
+$FIREBASE_API_KEY = "YOUR_FIREBASE_API_KEY"
 
 # 백엔드 서버 URL
 $API_BASE_URL = "http://localhost"
