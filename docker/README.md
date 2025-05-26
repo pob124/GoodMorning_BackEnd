@@ -1,4 +1,4 @@
-# Morning Hiking Partner 데이터베이스 설정
+# GoodMorning_BackEnd 데이터베이스 설정
 
 이 프로젝트는 데이터베이스 설정을 위해 Alembic 마이그레이션 시스템을 사용합니다.
 
