@@ -65,19 +65,6 @@ class User(UserBase):
     class Config:
         orm_mode = True
 
-class UserProfile(BaseModel):
-    """사용자 프로필 스키마"""
-    uid: str
-    nickname: Optional[str] = None
-    bio: Optional[str] = None
-    profileImageUrl: Optional[str] = None
-    likes: int = 0
-
-    model_config = {
-        "arbitrary_types_allowed": True,
-        "from_attributes": True
-    }
-
 class Token(BaseModel):
     """토큰 스키마"""
     access_token: str

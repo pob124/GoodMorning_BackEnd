@@ -1,6 +1,6 @@
 # app/core/firebase.py
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.core.config import settings
@@ -11,6 +11,12 @@ import logging
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# OAuth2PasswordBearer 스키마 정의
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/auth/token",
+    description="Firebase ID Token을 입력하세요"
+)
 
 # Firebase Admin SDK 초기화
 def initialize_firebase():
@@ -49,9 +55,18 @@ async def verify_token(token: str):
         )
 
 # 현재 사용자 ID 가져오기
-async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+async def get_current_user_id(token: str = Depends(oauth2_scheme)):
+    """
+    Firebase ID Token에서 현재 사용자 ID를 추출합니다.
+    
+    **인증 필요**: SwaggerUI의 Authorize 버튼을 사용하여 Firebase ID Token 입력
+    - Username: 아무 값 (예: "user")
+    - Password: Firebase ID Token
+    
+    Returns:
+        str: Firebase UID
+    """
     try:
-        token = credentials.credentials
         logger.info(f"Getting current user ID from token: {token[:20]}...")
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token["uid"]

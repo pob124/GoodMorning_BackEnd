@@ -1,21 +1,52 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordBearer
 from app.core.firebase import verify_token, get_db, auth
-from app.models.user_models import Token, UserDB
-from app.schemas.auth import LoginRequest, TokenResponse, TokenData
+from app.models.user_models import TokenData, UserDB
 from sqlalchemy.orm import Session
 import logging
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # 로깅 설정
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["인증"])
+
+@router.post("/login")
+async def login(
+    request_data: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Firebase UID를 사용하여 커스텀 토큰을 생성합니다."""
+    try:
+        uid = request_data.get("uid")
+        if not uid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="UID is required"
+            )
+        
+        # Firebase 커스텀 토큰 생성
+        custom_token = auth.create_custom_token(uid)
+        
+        # 바이트를 문자열로 변환
+        if isinstance(custom_token, bytes):
+            custom_token = custom_token.decode('utf-8')
+        
+        logger.info(f"Custom token created for UID: {uid}")
+        
+        return {
+            "access_token": custom_token,
+            "token_type": "bearer",
+            "uid": uid
+        }
+    except Exception as e:
+        logger.error(f"Failed to create custom token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create custom token: {str(e)}"
+        )
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
     decoded_token = await verify_token(token)
@@ -24,6 +55,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
 
     print("decode 성공")
     return TokenData(firebase_uid=decoded_token["uid"])
+
+
 
 @router.post("/sync")
 async def sync_user(
@@ -44,31 +77,3 @@ async def sync_user(
         db.commit()
 
     return {"success": True, "uid": uid}
-
-
-@router.post("/login", response_model=TokenResponse)
-async def create_custom_token(request: LoginRequest):
-    try:
-        uid = request.token
-        
-        if not uid:
-            raise HTTPException(status_code=400, detail="UID is required")
-        
-        # Firebase Admin SDK로 커스텀 토큰 생성
-        custom_token = auth.create_custom_token(uid)
-        
-        # bytes를 string으로 변환
-        if isinstance(custom_token, bytes):
-            custom_token = custom_token.decode('utf-8')
-        
-        return {
-            "access_token": custom_token,
-            "token_type": "bearer"
-        }
-        
-    except Exception as e:
-        logger.error(f"커스텀 토큰 생성 실패: {str(e)}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to create custom token: {str(e)}"
-        )

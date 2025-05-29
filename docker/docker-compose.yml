@@ -25,9 +25,13 @@ services:
     environment:
       - PYTHONPATH=/app
       - APP_NAME=Morning Hiking Partner API
-      - DEBUG=${DEBUG:-False}
+      - DEBUG=${DEBUG:-True}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/docker/firebase-adminsdk.json
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-mhp_db}
+      - POSTGRES_SERVER=${POSTGRES_HOST:-db}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-mhp_db}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

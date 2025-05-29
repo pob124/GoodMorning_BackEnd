@@ -22,34 +22,31 @@ async def get_user_profile(
     user = db.query(UserDB).filter(UserDB.firebase_uid == uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
+    
     return UserProfile(
         uid=user.firebase_uid,
         nickname=user.name,
         bio=user.bio,
         profileImageUrl=user.profile_picture,
-        likes=user.likes or 0
+        likes=user.likes
     )
 
 # [프로필] 프로필 정보 수정
 @router.patch("/profile", response_model=UserProfile, summary="프로필 수정")
 async def update_user_profile(
-    profile_update: UserProfile,
+    update_data: dict = Body(...),
     current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
-    """사용자의 프로필 정보를 수정합니다."""
+    """사용자의 bio 및 nickname 정보를 수정합니다."""
     user = db.query(UserDB).filter(UserDB.firebase_uid == current_user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # 프로필 업데이트
-    if profile_update.nickname is not None:
-        user.name = profile_update.nickname
-    if profile_update.bio is not None:
-        user.bio = profile_update.bio
-    if profile_update.profileImageUrl is not None:
-        user.profile_picture = profile_update.profileImageUrl
+
+    if "bio" in update_data:
+        user.bio = update_data["bio"]
+    if "nickname" in update_data:
+        user.name = update_data["nickname"]
 
     db.commit()
     db.refresh(user)
@@ -59,7 +56,7 @@ async def update_user_profile(
         nickname=user.name,
         bio=user.bio,
         profileImageUrl=user.profile_picture,
-        likes=user.likes or 0
+        likes=user.likes
     )
 
 # [프로필] 전체 사용자 목록 조회
@@ -77,7 +74,7 @@ async def get_users(
             nickname=user.name,
             bio=user.bio,
             profileImageUrl=user.profile_picture,
-            likes=user.likes or 0
+            likes=user.likes
         )
         for user in users
     ]

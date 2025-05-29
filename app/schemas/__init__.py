@@ -7,7 +7,7 @@ from app.schemas.user import UserProfile
 # Chatroom 스키마
 from app.schemas.chatroom import (
     Coordinate, CreateChatroomRequest, Message, 
-    Chatroom, ChatroomFilter, UserProfile as ChatroomUserProfile
+    Chatroom, ChatroomFilter
 )
 
 # Chat 스키마

@@ -1,72 +1,21 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Table, Float, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Table, Float, Text, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.core.database import Base
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from app.models.user_models import Base  # 공통 Base 사용
 from datetime import datetime
 import json
-from app.models.user_models import UserProfile  # UserProfile 모델 import
+
+# Schemas에서 Pydantic 모델들 import
+from app.schemas.user import UserProfile
+from app.schemas.chatroom import Coordinate, Message, Chatroom
 
 # 채팅방-사용자 다대다 관계를 위한 중간 테이블
 chatroom_participants = Table(
     'chatroom_participants',
     Base.metadata,
-    Column('chatroom_id', Integer, ForeignKey('chatrooms.id')),
-    Column('user_id', Integer, ForeignKey('users.id'))
+    Column('chatroom_id', String, ForeignKey('chatrooms.id')),
+    Column('user_id', UUID, ForeignKey('users.id'))
 )
-
-# Pydantic 모델 (API 스키마에 맞춤)
-class Coordinate(BaseModel):
-    latitude: float = Field(..., description="위도")
-    longitude: float = Field(..., description="경도")
-
-class MessageBase(BaseModel):
-    content: str = Field(..., description="메시지 내용")
-
-class MessageCreate(MessageBase):
-    """메시지 생성 요청 모델"""
-    chatroom_id: str = Field(..., description="채팅방 ID")
-
-class Message(BaseModel):
-    id: str = Field(..., description="메시지 ID")
-    senderId: str = Field(..., description="발신자 ID")
-    content: str = Field(..., description="메시지 내용")
-    timestamp: datetime = Field(..., description="타임스탬프")
-
-    class Config:
-        from_attributes = True
-
-class ChatroomBase(BaseModel):
-    title: str = Field(..., description="채팅방 제목")
-
-class ChatroomCreate(BaseModel):
-    title: str = Field(..., description="채팅방 제목")
-    participants: List[str] = Field(..., min_items=1, max_items=2, description="참가자 목록 (최소 1명, 최대 2명)")
-    connection: List[Coordinate] = Field(..., min_items=1, max_items=2, description="위치 정보 (최소 1개, 최대 2개)")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "title": "새로운 채팅방",
-                "participants": ["user1", "user2"],
-                "connection": [
-                    {"latitude": 37.5665, "longitude": 126.9780},
-                    {"latitude": 37.5665, "longitude": 126.9780}
-                ]
-            }
-        }
-
-class Chatroom(BaseModel):
-    id: str = Field(..., description="채팅방 ID")
-    title: str = Field(..., description="채팅방 제목")
-    participants: List[UserProfile] = Field(..., min_items=1, max_items=2, description="참가자 목록")
-    connection: List[Coordinate] = Field(..., min_items=1, max_items=2, description="위치 정보")
-    createdAt: datetime = Field(..., description="생성 시간")
-    message: List[Message] = Field(default_factory=list, min_items=0, max_items=10, alias="Message")
-
-    class Config:
-        from_attributes = True
 
 # SQLAlchemy 모델 (DB 스키마에 맞춤)
 class ChatroomDB(Base):
@@ -110,7 +59,7 @@ class ChatroomDB(Base):
             participants=user_profiles,
             connection=self.get_connection(),
             createdAt=self.created_at,
-            message=[msg.to_api_model() for msg in recent_messages[:10]]
+            messages=[msg.to_api_model() for msg in recent_messages[:10]]
         )
 
 class MessageDB(Base):
@@ -132,21 +81,4 @@ class MessageDB(Base):
             senderId=self.sender_id,
             content=self.content,
             timestamp=self.timestamp
-        )
-
-# 검색 결과용 모델
-class ChatroomSearchResponse(BaseModel):
-    id: str
-    title: str
-    participants: List[UserProfile]
-    connection: List[Coordinate]
-    createdAt: datetime
-    message: List[Message] = Field(default_factory=list, max_items=1)  # messages를 Message로 변경하고 마지막 메시지만 포함
-    unread_count: int = 0  # 읽지 않은 메시지 수
-
-    class Config:
-        from_attributes = True
-
-class ChatroomFilter(BaseModel):
-    keyword: Optional[str] = None
-    is_active: Optional[bool] = True 
+        ) 

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.security import HTTPBearer
 from app.core.firebase import initialize_firebase
 from app.api import router as api_router
 import logging
@@ -23,11 +24,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger("mhp-api")
 
+# 보안 스키마 정의
+security = HTTPBearer()
+
 # 애플리케이션 초기화
 app = FastAPI(
     title="Project GoodMorning API",
     description="""
     Project GoodMorning Application API v1.0.0
+    
+    ## 🔐 Authentication
+    
+    이 API는 **Firebase Authentication**을 사용합니다.
+    
+    ### 인증 방법:
+    1. Firebase 클라이언트에서 로그인하여 **ID Token** 획득
+    2. 요청 헤더에 `Authorization: Bearer <firebase_id_token>` 추가
+    3. 아래 **Authorize** 버튼을 클릭하여 토큰 입력
+    
+    ### 테스트용 토큰 획득:
+    - `/api/auth/login` 엔드포인트에 Firebase UID를 전송하여 Custom Token 획득 가능
+    - 실제 운영에서는 Firebase 클라이언트 SDK 사용 권장
     
     ## Features
     
@@ -176,7 +193,7 @@ async def root():
         </head>
         <body>
             <h1>Project Good Morning</h1>
-            <p>Welcome to GoodMorning Partner API. This API provides endpoints for managing hiking partners and chat rooms.</p>
+            <p>Welcome to GoodMorning Partner API. This API provides endpoints for managing goodMorning partners and chat rooms.</p>
             
             <div class="links">
                 <a href="/api/docs">Swagger UI Documentation</a>
@@ -187,6 +204,40 @@ async def root():
         </body>
     </html>
     """
+
+# 커스텀 OpenAPI 스키마 생성
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    
+    # OAuth2 보안 스키마 추가
+    openapi_schema["components"]["securitySchemes"] = {
+        "OAuth2PasswordBearer": {
+            "type": "oauth2",
+            "flows": {
+                "password": {
+                    "tokenUrl": "/api/auth/token",
+                    "scopes": {}
+                }
+            },
+            "description": "Username: 아무 값, Password: Firebase ID Token을 입력하세요"
+        }
+    }
+    
+    # 전역 보안 설정 (선택적)
+    # openapi_schema["security"] = [{"OAuth2PasswordBearer": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # 직접 실행 시 서버 구동
 if __name__ == "__main__":

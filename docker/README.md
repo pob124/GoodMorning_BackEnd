@@ -1,100 +1,148 @@
-# Morning Hiking Partner 데이터베이스 설정
+# 🐳 Good Morning API Docker 환경
 
-이 프로젝트는 데이터베이스 설정을 위해 Alembic 마이그레이션 시스템을 사용합니다.
+## 📁 **폴더 구조**
 
-## Docker 환경에서 실행
+```
+docker/
+├── 📋 README.md                    # 이 파일
+├── 🐳 Dockerfile                   # Docker 이미지 빌드 설정
+├── 🔧 docker-compose.yml           # 개발용 Docker Compose
+├── 🚀 docker-compose.prod.yml      # 프로덕션용 Docker Compose
+├── 🔑 firebase-adminsdk.json       # Firebase 인증 키
+├── 🔑 firebase_token.json          # Firebase 토큰
+│
+├── 📚 docs/                        # 문서 모음
+│   ├── DEPLOYMENT.md               # 일반 배포 가이드
+│   ├── DUCKDNS_SETUP.md           # DuckDNS 설정 가이드
+│   ├── WINDOWS_DEPLOY.md          # Windows 배포 가이드
+│   └── PORT_FORWARDING_GUIDE.md   # 포트 포워딩 가이드
+│
+├── 🛠️ scripts/                     # 배포 스크립트
+│   ├── deploy.sh                   # Linux/Mac 배포 스크립트
+│   ├── deploy-production.sh        # Linux/Mac 프로덕션 배포
+│   └── deploy-production.ps1       # Windows 프로덕션 배포
+│
+├── ⚙️ configs/                     # 설정 파일
+│   ├── env.example                 # 환경변수 예시
+│   ├── env.production              # 프로덕션 환경변수
+│   └── heroku.yml                  # Heroku 배포 설정
+│
+├── 🗄️ backups/                     # 백업 파일
+│   ├── default.conf.backup         # Nginx 설정 백업
+│   └── ssl.conf.disabled           # 비활성화된 SSL 설정
+│
+└── 🌐 nginx/                       # Nginx 설정
+    ├── conf.d/
+    │   └── default.conf             # 현재 Nginx 설정
+    ├── www/                         # 웹 루트 디렉토리
+    └── ssl/                         # SSL 인증서 저장소
+```
 
-### 서비스 시작
+## 🚀 **빠른 시작**
+
+### **개발 환경**
 ```bash
-# 모든 서비스 시작
+docker-compose up -d
+```
+
+### **프로덕션 환경 (Windows)**
+```powershell
+.\scripts\deploy-production.ps1
+```
+
+### **프로덕션 환경 (Linux/Mac)**
+```bash
+./scripts/deploy-production.sh
+```
+
+## 📖 **문서 가이드**
+
+| 문서 | 설명 | 대상 |
+|------|------|------|
+| `docs/WINDOWS_DEPLOY.md` | Windows에서 배포하기 | Windows 사용자 |
+| `docs/DUCKDNS_SETUP.md` | DuckDNS 도메인 설정 | 모든 사용자 |
+| `docs/PORT_FORWARDING_GUIDE.md` | 포트 포워딩 설정 | 홈 서버 운영자 |
+| `docs/DEPLOYMENT.md` | 클라우드 배포 가이드 | 클라우드 배포자 |
+
+## ⚙️ **설정 파일**
+
+### **환경변수 설정**
+1. `configs/env.example`을 복사하여 `.env` 파일 생성
+2. 필요한 값들을 수정
+
+### **프로덕션 환경**
+- `configs/env.production` 파일 사용
+- 강력한 비밀번호로 설정됨
+
+## 🔧 **주요 명령어**
+
+### **서비스 관리**
+```bash
+# 서비스 시작
 docker-compose up -d
 
-# 특정 서비스만 재시작
-docker-compose restart web
-```
+# 서비스 중지
+docker-compose down
 
-### 서비스 접속
-- **API 문서**: http://localhost/docs
-- **WebSocket 테스트**: http://localhost/static/websocket_test.html
-- **PgAdmin**: http://localhost/pgadmin/
-
-## 채팅 시스템 테스트
-
-### 1. Firebase 토큰 발급
-```bash
-# PowerShell에서 실행 (프로젝트 루트에서)
-.\get_firebase_token.ps1
-```
-
-### 2. REST API 테스트
-1. http://localhost/docs 접속
-2. "Authorize" 버튼 클릭
-3. 발급받은 Firebase ID 토큰 입력
-4. 채팅 관련 API 테스트:
-   - `POST /api/chat/{room_id}`: 메시지 전송
-   - `GET /api/chat/{room_id}`: 메시지 조회
-   - `GET /api/chat/search`: 메시지 검색
-
-### 3. WebSocket 테스트
-1. http://localhost/static/websocket_test.html 접속
-2. 채팅방 ID 입력 (예: test-room)
-3. Firebase ID 토큰 입력
-4. "연결" 버튼 클릭
-5. "인증 메시지 전송" 버튼 클릭
-6. Ping/Pong 및 활성 사용자 조회 테스트
-
-### 4. 실시간 채팅 테스트
-1. 두 개의 브라우저 탭에서 WebSocket 테스트 페이지 열기
-2. 같은 채팅방 ID로 연결
-3. 한 탭에서 REST API로 메시지 전송: `POST /api/chat/{room_id}`
-4. 다른 탭에서 WebSocket으로 실시간 메시지 수신 확인
-
-## 로그 확인
-```bash
-# 웹 서비스 로그 확인
-docker-compose logs -f web
-
-# 모든 서비스 로그 확인
+# 로그 확인
 docker-compose logs -f
+
+# 서비스 상태 확인
+docker-compose ps
 ```
 
-## 데이터베이스 설정 방법
-
-### 사전 요구사항
-
-- PostgreSQL이 설치되어 있어야 합니다.
-- Python과 필요한 패키지가 설치되어 있어야 합니다.
-
-### 데이터베이스 마이그레이션 실행
-
-프로젝트 루트 디렉토리에서 다음 명령을 실행합니다:
-
+### **프로덕션 관리**
 ```bash
-# 모든 마이그레이션을 적용
-alembic upgrade head
+# 프로덕션 서비스 시작
+docker-compose -f docker-compose.prod.yml up -d
+
+# 프로덕션 로그 확인
+docker-compose -f docker-compose.prod.yml logs -f
 ```
 
-이 명령은 통합 마이그레이션 파일(`alembic/versions/unified_migration.py`)을 사용하여 필요한 모든 테이블을 생성합니다.
+## 🌐 **접속 정보**
 
-### 데이터베이스 연결 설정
+### **개발 환경**
+- API 문서: http://localhost/api/docs
+- PgAdmin: http://localhost/pgadmin/
 
-데이터베이스 연결 정보는 `alembic.ini` 파일에서 설정할 수 있습니다:
+### **프로덕션 환경**
+- API 문서: https://goodmorningkr01.duckdns.org/api/docs
+- PgAdmin: https://goodmorningkr01.duckdns.org/pgadmin/
+- WebSocket 테스트: https://goodmorningkr01.duckdns.org/static/websocket_test.html
 
+## 🔒 **보안 정보**
+
+### **기본 계정 정보**
+- **PgAdmin 이메일**: hch3154@gmail.com
+- **PgAdmin 비밀번호**: configs/env.production 파일 참조
+
+### **방화벽 설정**
+- HTTP: 80번 포트
+- HTTPS: 443번 포트
+
+## 🆘 **문제 해결**
+
+### **일반적인 문제**
+1. **포트 충돌**: `docker-compose down` 후 재시작
+2. **권한 오류**: 관리자 권한으로 실행
+3. **네트워크 오류**: 방화벽 설정 확인
+
+### **로그 확인**
+```bash
+# 전체 로그
+docker-compose logs
+
+# 특정 서비스 로그
+docker-compose logs web
+docker-compose logs nginx
+docker-compose logs db
 ```
-sqlalchemy.url = postgresql://사용자명:비밀번호@호스트:포트/데이터베이스명
-```
 
-예시:
-```
-sqlalchemy.url = postgresql://postgres:password@localhost:5432/mhp_db
-```
+## 📞 **지원**
 
-## 스키마 구조
-
-마이그레이션은 다음 테이블을 생성합니다:
-
-1. `users` - 사용자 정보를 저장하는 테이블
-2. `chatrooms` - 채팅방 정보를 저장하는 테이블
-3. `messages` - 채팅 메시지를 저장하는 테이블
-
-모든 테이블은 API 문서의 스키마에 맞게 설계되었습니다. 
+문제가 발생하면 다음 정보와 함께 문의:
+- 오류 메시지
+- 로그 내용
+- 운영체제 정보
+- Docker 버전

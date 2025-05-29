@@ -9,7 +9,7 @@ class MessageRequest(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                "content": "안녕하세요! 등산 가실래요?"
+                "content": "안녕하세요?"
             }
         }
 
