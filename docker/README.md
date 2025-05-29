@@ -104,7 +104,7 @@ docker-compose -f docker-compose.prod.yml logs -f
 
 ### **개발 환경**
 - API 문서: http://localhost/api/docs
-- PgAdmin: http://localhost/pgadmin/
+- PgAdmin: http://localhost/pgladmin/
 
 ### **프로덕션 환경**
 - API 문서: https://goodmorningkr01.duckdns.org/api/docs
@@ -138,6 +138,16 @@ docker-compose logs web
 docker-compose logs nginx
 docker-compose logs db
 ```
+
+## 📊 **데이터베이스 스키마**
+
+마이그레이션은 다음 테이블을 생성합니다:
+
+1. `users` - 사용자 정보를 저장하는 테이블
+2. `chatrooms` - 채팅방 정보를 저장하는 테이블
+3. `messages` - 채팅 메시지를 저장하는 테이블
+
+모든 테이블은 API 문서의 스키마에 맞게 설계되었습니다.
 
 ## 📞 **지원**
 
