@@ -6,6 +6,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import HTTPBearer
 from app.core.firebase import initialize_firebase
 from app.api import router as api_router
+from app.utils.init_data import init_application_data
 import logging
 import time
 import os
@@ -141,17 +142,27 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error"}
     )
 
-# 시작 이벤트
+# 애플리케이션 이벤트 핸들러
 @app.on_event("startup")
 async def startup_event():
-    logger.info("애플리케이션 시작...")
+    """애플리케이션 시작 시 실행되는 이벤트"""
+    logger.info("애플리케이션이 시작됩니다...")
+    
+    # Firebase 초기화
     initialize_firebase()
     logger.info("Firebase 초기화 완료")
+    
+    # 기본 데이터 초기화 (기본 채팅방 생성)
+    try:
+        await init_application_data()
+        logger.info("기본 데이터 초기화 완료")
+    except Exception as e:
+        logger.error(f"기본 데이터 초기화 실패: {str(e)}")
 
-# 종료 이벤트
 @app.on_event("shutdown")
 async def shutdown_event():
-    logger.info("애플리케이션 종료...")
+    """애플리케이션 종료 시 실행되는 이벤트"""
+    logger.info("애플리케이션이 종료됩니다...")
 
 # API 라우터 등록
 app.include_router(api_router, prefix="/api")
