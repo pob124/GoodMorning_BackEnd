@@ -14,7 +14,7 @@ import uuid
 
 # revision identifiers
 revision = 'create_default_chatrooms'
-down_revision = '60f216c54686_add_chatroom_and_message_models'  # 실제 존재하는 마이그레이션 ID로 변경
+down_revision = 'add_likes_column'  # add_likes_column 다음으로 수정
 branch_labels = None
 depends_on = None
 

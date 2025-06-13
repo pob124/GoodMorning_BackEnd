@@ -1,0 +1,119 @@
+openapi: 3.0.0
+info:
+  title: User Service API
+  version: 1.0.0
+  description: 사용자 관리 서비스 API
+
+servers:
+  - url: http://user-service:8000
+    description: User service server
+
+paths:
+  /users:
+    post:
+      summary: 사용자 생성
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: 사용자 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  /users/{user_id}:
+    get:
+      summary: 사용자 정보 조회
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 사용자 정보 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+    patch:
+      summary: 사용자 정보 수정
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: 사용자 정보 수정 성공
+
+    delete:
+      summary: 사용자 삭제
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 사용자 삭제 성공
+
+components:
+  schemas:
+    UserCreate:
+      type: object
+      required:
+        - firebase_uid
+        - nickname
+      properties:
+        firebase_uid:
+          type: string
+        nickname:
+          type: string
+        bio:
+          type: string
+        profile_image_url:
+          type: string
+
+    UserUpdate:
+      type: object
+      properties:
+        nickname:
+          type: string
+        bio:
+          type: string
+        profile_image_url:
+          type: string
+
+    UserResponse:
+      type: object
+      properties:
+        uid:
+          type: string
+        nickname:
+          type: string
+        bio:
+          type: string
+        profile_image_url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

@@ -1,0 +1,133 @@
+# docs/chat_service.yml
+openapi: 3.0.0
+info:
+  title: Chat Service API
+  version: 1.0.0
+  description: 채팅 서비스 API
+
+servers:
+  - url: http://chat-service:8000
+    description: Chat service server
+
+paths:
+  /chatrooms:
+    post:
+      summary: 채팅방 생성
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatroomCreate'
+      responses:
+        '201':
+          description: 채팅방 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatroomResponse'
+
+  /chatrooms/{room_id}/messages:
+    get:
+      summary: 채팅방 메시지 조회
+      parameters:
+        - name: room_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 메시지 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageResponse'
+
+    post:
+      summary: 메시지 전송
+      parameters:
+        - name: room_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageCreate'
+      responses:
+        '201':
+          description: 메시지 전송 성공
+
+  /ws/chat/{room_id}:
+    get:
+      summary: WebSocket 연결
+      description: 실시간 채팅을 위한 WebSocket 엔드포인트
+      parameters:
+        - name: room_id
+          in: path
+          required: true
+          schema:
+            type: string
+
+components:
+  schemas:
+    ChatroomCreate:
+      type: object
+      required:
+        - title
+        - participants
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        participants:
+          type: array
+          items:
+            type: string
+
+    ChatroomResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        participants:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    MessageCreate:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+
+    MessageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        sender_id:
+          type: string
+        room_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time

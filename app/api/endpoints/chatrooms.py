@@ -10,12 +10,27 @@ from typing import List, Dict, Any, Optional
 import json
 import uuid
 from datetime import datetime
+import ast
+import logging
 
 router = APIRouter(
     prefix="/chatrooms",
     tags=["채팅방"],
     responses={404: {"description": "Not found"}},
 )
+
+def parse_participants(raw):
+    if not raw or raw == "[]":
+        return []
+    if isinstance(raw, list):
+        return raw
+    if raw.startswith("["):
+        # JSON 문자열
+        return json.loads(raw)
+    if raw.startswith("{") and raw.endswith("}"):
+        # PostgreSQL 배열 문자열
+        return [x.strip() for x in raw[1:-1].split(",") if x.strip()]
+    return []
 
 # [채팅방] 조건에 맞는 채팅방 목록(검색) 조회
 @router.get("/search", response_model=List[Chatroom])
@@ -40,11 +55,17 @@ async def search_chatrooms(
     # DB 객체 목록을 Pydantic 모델 목록으로 변환
     result = []
     for chatroom in chatrooms_db:
-        # 참가자 정보 조회
-        participant_ids = json.loads(chatroom.participants) if chatroom.participants else []
+        # 1. participants 원본 값과 타입
+        logging.warning(f"participants raw: {chatroom.participants} ({type(chatroom.participants)})")
+        participant_ids = parse_participants(chatroom.participants)
+        logging.warning(f"participant_ids after parsing: {participant_ids} ({type(participant_ids)})")
         user_profiles = []
         for uid in participant_ids:
+            # 3. for문에서 uid 값
+            logging.warning(f"querying user: {uid}")
             user = db.query(UserDB).filter(UserDB.firebase_uid == uid).first()
+            # 4. 쿼리 결과
+            logging.warning(f"user found: {user}")
             if user:
                 user_profiles.append(UserProfile(
                     uid=user.firebase_uid,
@@ -53,6 +74,8 @@ async def search_chatrooms(
                     profileImageUrl=user.profile_picture,
                     likes=user.likes or 0
                 ))
+        # 5. user_profiles 최종 값
+        logging.warning(f"user_profiles: {user_profiles}")
         
         # 최근 메시지 조회
         messages = db.query(MessageDB).filter(MessageDB.chatroom_id == chatroom.id).order_by(MessageDB.timestamp.desc()).limit(10).all()
@@ -138,7 +161,10 @@ async def get_chatroom(
     chatroom = get_chatroom_or_404(db, chatroom_id)
     
     # 참가자 정보 조회
-    participant_ids = json.loads(chatroom.participants) if chatroom.participants else []
+    participant_ids = chatroom.participants if chatroom.participants else []
+    if isinstance(participant_ids, str):
+        # PostgreSQL 배열 문자열을 파이썬 리스트로 변환
+        participant_ids = ast.literal_eval(participant_ids.replace('{', '[').replace('}', ']'))
     user_profiles = []
     for uid in participant_ids:
         user = db.query(UserDB).filter(UserDB.firebase_uid == uid).first()
@@ -184,11 +210,17 @@ async def get_chatrooms(
     # DB 객체 목록을 Pydantic 모델 목록으로 변환
     result = []
     for chatroom in chatrooms_db:
-        # 참가자 정보 조회
-        participant_ids = json.loads(chatroom.participants) if chatroom.participants else []
+        # 1. participants 원본 값과 타입
+        logging.warning(f"participants raw: {chatroom.participants} ({type(chatroom.participants)})")
+        participant_ids = parse_participants(chatroom.participants)
+        logging.warning(f"participant_ids after parsing: {participant_ids} ({type(participant_ids)})")
         user_profiles = []
         for uid in participant_ids:
+            # 3. for문에서 uid 값
+            logging.warning(f"querying user: {uid}")
             user = db.query(UserDB).filter(UserDB.firebase_uid == uid).first()
+            # 4. 쿼리 결과
+            logging.warning(f"user found: {user}")
             if user:
                 user_profiles.append(UserProfile(
                     uid=user.firebase_uid,
@@ -197,6 +229,8 @@ async def get_chatrooms(
                     profileImageUrl=user.profile_picture,
                     likes=user.likes or 0
                 ))
+        # 5. user_profiles 최종 값
+        logging.warning(f"user_profiles: {user_profiles}")
         
         # 최근 메시지 조회
         messages = db.query(MessageDB).filter(MessageDB.chatroom_id == chatroom.id).order_by(MessageDB.timestamp.desc()).limit(10).all()
@@ -207,13 +241,24 @@ async def get_chatrooms(
             timestamp=msg.timestamp
         ) for msg in messages]
         
+        # connection 데이터 처리
+        connection_data = []
+        if chatroom.connection:
+            try:
+                if isinstance(chatroom.connection, str):
+                    connection_data = json.loads(chatroom.connection)
+                else:
+                    connection_data = chatroom.connection
+            except:
+                connection_data = []
+        
         result.append(Chatroom(
             id=str(chatroom.id),
             title=chatroom.title,
             participants=user_profiles,
-            connection=json.loads(chatroom.connection) if chatroom.connection else [],
+            connection=connection_data,
             createdAt=chatroom.created_at,
-            Message=message_models  # API.yaml에 맞춰 "Message"로 변경
+            Message=message_models
         ))
     
     return result
@@ -230,7 +275,7 @@ async def join_chatroom(
     chatroom = get_chatroom_or_404(db, room_id)
     
     # 현재 참여자 목록 가져오기
-    current_participants = json.loads(chatroom.participants) if chatroom.participants else []
+    current_participants = chatroom.participants if chatroom.participants else []
     
     # 이미 참여 중인지 확인
     if current_user_id in current_participants:
@@ -290,7 +335,7 @@ async def leave_chatroom(
     chatroom = get_chatroom_or_404(db, room_id)
     
     # 현재 참여자 목록 가져오기
-    current_participants = json.loads(chatroom.participants) if chatroom.participants else []
+    current_participants = chatroom.participants if chatroom.participants else []
     
     # 참여 중인지 확인
     if current_user_id not in current_participants:

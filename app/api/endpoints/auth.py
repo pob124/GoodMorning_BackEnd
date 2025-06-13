@@ -66,14 +66,47 @@ async def sync_user(
     uid = token_data.firebase_uid
     firebase_user = auth.get_user(uid)
 
+    # Firebase 사용자 정보 로깅
+    logger.info(f"Firebase user info for UID {uid}:")
+    logger.info(f"  - Email: {firebase_user.email}")
+    logger.info(f"  - Display Name: {firebase_user.display_name}")
+    logger.info(f"  - Photo URL: {firebase_user.photo_url}")
+    logger.info(f"  - Phone Number: {firebase_user.phone_number}")
+    logger.info(f"  - Provider Data: {firebase_user.provider_data}")
+
     db_user = db.query(UserDB).filter_by(firebase_uid=uid).first()
     if not db_user:
+        # 새 사용자 생성 시 모든 Firebase 정보 저장
         db_user = UserDB(
             firebase_uid=uid,
             email=firebase_user.email or "",
-            name=firebase_user.display_name or ""
+            name=firebase_user.display_name or "",
+            profile_picture=firebase_user.photo_url,  # 프로필 이미지 URL 저장
+            phone_number=firebase_user.phone_number
         )
         db.add(db_user)
-        db.commit()
+        logger.info(f"Created new user with profile_picture: {firebase_user.photo_url}")
+    else:
+        # 기존 사용자 정보 업데이트 (프로필 이미지가 비어있을 경우에만)
+        updated = False
+        if not db_user.profile_picture and firebase_user.photo_url:
+            db_user.profile_picture = firebase_user.photo_url
+            updated = True
+            logger.info(f"Updated existing user profile_picture: {firebase_user.photo_url}")
+        
+        if firebase_user.display_name and db_user.name != firebase_user.display_name:
+            db_user.name = firebase_user.display_name
+            updated = True
+            
+        if updated:
+            logger.info(f"Updated user info for UID {uid}")
+    
+    db.commit()
+    db.refresh(db_user)
 
-    return {"success": True, "uid": uid}
+    return {
+        "success": True, 
+        "uid": uid,
+        "profile_picture": db_user.profile_picture,
+        "display_name": db_user.name
+    }

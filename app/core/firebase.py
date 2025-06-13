@@ -7,6 +7,7 @@ from app.core.config import settings
 import firebase_admin
 from firebase_admin import credentials, auth
 import logging
+import time
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -43,7 +44,19 @@ def get_db():
 async def verify_token(token: str):
     try:
         logger.info(f"Verifying token: {token[:20]}...")
-        decoded_token = auth.verify_id_token(token)
+        
+        # 시간 동기화 문제 해결을 위해 check_revoked=False로 설정하고
+        # 시간 검증을 더 관대하게 처리
+        try:
+            decoded_token = auth.verify_id_token(token, check_revoked=False)
+        except Exception as e:
+            if "Token used too early" in str(e):
+                logger.warning(f"Token timing issue detected, retrying in 2 seconds: {str(e)}")
+                time.sleep(2)
+                decoded_token = auth.verify_id_token(token, check_revoked=False)
+            else:
+                raise e
+                
         logger.info(f"Token verified successfully. UID: {decoded_token.get('uid')}")
         return decoded_token
     except Exception as e:
@@ -68,7 +81,18 @@ async def get_current_user_id(token: str = Depends(oauth2_scheme)):
     """
     try:
         logger.info(f"Getting current user ID from token: {token[:20]}...")
-        decoded_token = auth.verify_id_token(token)
+        
+        # 시간 동기화 문제 해결을 위한 재시도 로직
+        try:
+            decoded_token = auth.verify_id_token(token, check_revoked=False)
+        except Exception as e:
+            if "Token used too early" in str(e):
+                logger.warning(f"Token timing issue detected, retrying in 2 seconds: {str(e)}")
+                time.sleep(2)
+                decoded_token = auth.verify_id_token(token, check_revoked=False)
+            else:
+                raise e
+                
         uid = decoded_token["uid"]
         logger.info(f"Current user ID: {uid}")
         return uid

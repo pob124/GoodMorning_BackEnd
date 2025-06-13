@@ -34,11 +34,13 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-mhp_db}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - TZ=Asia/Seoul
     command: |
       bash -c "
         echo 'Waiting for PostgreSQL to be ready...'
-        while ! nc -z db 5432; do
-          sleep 1
+        while ! python -c 'import socket; sock = socket.socket(); sock.settimeout(1); sock.connect((\"db\", 5432)); sock.close()' 2>/dev/null; do
+          echo 'PostgreSQL not ready, waiting...'
+          sleep 2
         done
         echo 'PostgreSQL is ready! Starting application...'
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

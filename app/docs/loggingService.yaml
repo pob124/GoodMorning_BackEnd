@@ -1,0 +1,95 @@
+# docs/logging_service.yml
+openapi: 3.0.0
+info:
+  title: Logging Service API
+  version: 1.0.0
+  description: 로깅 서비스 API
+
+servers:
+  - url: http://logging-service:8000
+    description: Logging service server
+
+paths:
+  /logs:
+    post:
+      summary: 로그 기록
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogCreate'
+      responses:
+        '201':
+          description: 로그 기록 성공
+
+  /logs/search:
+    get:
+      summary: 로그 검색
+      parameters:
+        - name: service
+          in: query
+          schema:
+            type: string
+        - name: level
+          in: query
+          schema:
+            type: string
+        - name: start_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: 로그 검색 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogResponse'
+
+components:
+  schemas:
+    LogCreate:
+      type: object
+      required:
+        - service
+        - level
+        - message
+      properties:
+        service:
+          type: string
+        level:
+          type: string
+          enum: [INFO, WARNING, ERROR, DEBUG]
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+
+    LogResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        service:
+          type: string
+        level:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        metadata:
+          type: object

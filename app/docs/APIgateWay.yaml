@@ -1,0 +1,85 @@
+# docs/api_gateway.yml
+openapi: 3.0.0
+info:
+  title: Good Morning API Gateway
+  version: 1.0.0
+  description: API Gateway for Good Morning MSA
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /api/v1/users/{user_id}:
+    get:
+      summary: 사용자 정보 조회
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 사용자 정보 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '404':
+          description: 사용자를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/chatrooms:
+    get:
+      summary: 채팅방 목록 조회
+      responses:
+        '200':
+          description: 채팅방 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatroomResponse'
+
+components:
+  schemas:
+    UserResponse:
+      type: object
+      properties:
+        uid:
+          type: string
+        nickname:
+          type: string
+        bio:
+          type: string
+        profile_image_url:
+          type: string
+
+    ChatroomResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        participants:
+          type: array
+          items:
+            type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
